@@ -1,0 +1,8 @@
+/* RTL برای فارسی */
+html[lang="fa"] {
+  direction: rtl;
+}
+
+html[lang="fa"] body {
+  font-family: 'Vazirmatn', sans-serif;
+}

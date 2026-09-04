@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "React Odontogram Modul"
+abstract: >-
+  An interactive, SVG-based dental odontogram (dental chart) editor for React
+  and TypeScript. Supports multi-surface caries and filling charting, endodontic,
+  prosthetic and periodontal states, FDI/Universal/Palmer tooth numbering,
+  HL7 FHIR R4 export/import, optional ICDAS II caries scoring, and a user
+  interface localized in nine languages.
+version: 1.11.1
+date-released: 2026-07-10
+url: "https://react-odontogram-modul.vercel.app/"
+repository-code: "https://github.com/ZoliQua/React-Odontogram-Modul"
+license: MIT
+# Zenodo concept (all-versions) DOI — auto-resolves to the latest archived
+# release. Recommended for citing the software in general. The DOI for this
+# specific release (v1.10.0) is listed under `identifiers:` below.
+doi: "10.5281/zenodo.21156787"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21156787"
+    description: "Zenodo concept DOI (all versions) — recommended for citing the software"
+  - type: doi
+    value: "10.5281/zenodo.21156788"
+    description: "Zenodo DOI for version 1.10.0"
+authors:
+  - family-names: Dul
+    given-names: Zoltán
+    orcid: "https://orcid.org/0000-0002-9523-3450"
+keywords:
+  - odontogram
+  - dental chart
+  - dental charting
+  - dentistry
+  - dental records
+  - tooth notation
+  - FDI notation
+  - ISO 3950
+  - HL7 FHIR
+  - ICDAS
+  - React
+  - TypeScript
+  - SVG

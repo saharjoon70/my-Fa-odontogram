@@ -1,0 +1,95 @@
+{
+  "name": "vue-advanced-odontogram",
+  "description": "Interactive dental chart editor component for Vue 3 with clinical charting, FHIR export, and multilingual UI",
+  "version": "2.1.0",
+  "author": "Zoltán Dul",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "odontogram",
+    "typodont",
+    "vue",
+    "vue3",
+    "dental-chart",
+    "dental",
+    "tooth",
+    "teeth",
+    "dental-editor",
+    "dentistry",
+    "medical",
+    "fhir",
+    "dental-notation"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/vue-advanced-odontogram.es.js",
+      "require": "./dist/vue-advanced-odontogram.cjs.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "main": "./dist/vue-advanced-odontogram.cjs.js",
+  "module": "./dist/vue-advanced-odontogram.es.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ci": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "parity:capture": "PARITY_CAPTURE=1 vitest run src/__tests__/parity/capture.test.ts",
+    "docs": "typedoc",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@types/fhir": "^0.0.44",
+    "@types/jsdom": "^28.0.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/test-utils": "^2.4.6",
+    "@vue/tsconfig": "^0.7.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^9.32.0",
+    "gh-pages": "^6.3.0",
+    "globals": "^15.15.0",
+    "jiti": "^2.6.1",
+    "jsdom": "^28.1.0",
+    "postcss": "^8.4.45",
+    "tailwindcss": "^3.4.10",
+    "typedoc": "^0.28.17",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.65.0",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^5.0.3",
+    "vitest": "^4.0.18",
+    "vue": "^3.5.13",
+    "vue-tsc": "^3.3.8"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8",
+    "glob": "^13.0.6",
+    "js-beautify": "^2.0.3",
+    "minimatch": "^10.2.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
