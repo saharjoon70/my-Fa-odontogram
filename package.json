@@ -41,19 +41,20 @@
   "main": "./dist/vue-advanced-odontogram.cjs.js",
   "module": "./dist/vue-advanced-odontogram.es.js",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ci": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "parity:capture": "PARITY_CAPTURE=1 vitest run src/__tests__/parity/capture.test.ts",
-    "docs": "typedoc",
-    "prepublishOnly": "npm run build"
-  },
+"scripts": {
+  "dev": "vite",
+  "build": "vue-tsc --noEmit && vite build",
+  "build:demo": "vue-tsc --noEmit && vite build --config vite.demo.config.ts",
+  "lint": "eslint .",
+  "preview": "vite preview",
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "test:ci": "vitest run",
+  "test:coverage": "vitest run --coverage",
+  "parity:capture": "PARITY_CAPTURE=1 vitest run src/__tests__/parity/capture.test.ts",
+  "docs": "typedoc",
+  "prepublishOnly": "npm run build"
+},
   "peerDependencies": {
     "vue": "^3.5.0"
   },
@@ -92,4 +93,5 @@
   "engines": {
     "node": ">=18.0.0"
   }
+
 }
