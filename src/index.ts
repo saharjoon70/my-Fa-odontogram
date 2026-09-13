@@ -43,6 +43,8 @@ export {
   exportImage,
   exportSvg,
   setImportFormat,
+  exportStatus,
+  importStatus
 } from "./odontogram";
 
 export type {

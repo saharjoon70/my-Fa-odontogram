@@ -4850,7 +4850,7 @@ export async function exportImage(format: "png" | "jpg" = "png"){
   }
 }
 
-function exportStatus(){
+export function exportStatus(){
   downloadJson(collectExportPayload(), "odontogram-status");
 }
 
@@ -4864,7 +4864,7 @@ export function exportFhir(options?: FhirExportOptions){
   downloadJson(bundle, "odontogram-fhir");
 }
 
-function importStatus(data: Any){
+export  function importStatus(data: Any){
   if(!data || typeof data !== "object") return;
   // FIX 1: only re-infer the legacy caries∩filling recurrent-caries intersection
   // for pre-2.3 payloads. A native ≥2.3 payload (including any FHIR bundle, which
