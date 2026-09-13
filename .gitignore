@@ -9,7 +9,7 @@ pnpm-debug.log*
 
 # === Build output ===
 build/
-dist/
+# dist/
 out/
 
 # === Env files ===
