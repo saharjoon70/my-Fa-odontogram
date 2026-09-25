@@ -533,4 +533,283 @@
       <path id="crown-replace-shape" d="M29.9,35.9c-5.7-5.8-15.3-4.6-18.9,1.9-1.6,3-2.7,6-3.5,9.3-1.5,5-3.5,15.4,3.1,18,4.3,1.4,8.9-2.2,13.4-1.1,1.9.3,3.5.9,5.2.7,11.7-2.4,5.8-15.2,3.4-23.3-.6-1.8-2.7-5.5-2.7-5.5Z" data-active="1" style="fill: none; stroke: #c83014; stroke-miterlimit: 10; stroke-width: 3px;" />
       </g>
     </g>
+    <g id="bone-graft" data-active="0" data-treatment="bone-graft">
+  <!-- ناحیه سینوس (بالای استخوان) -->
+  <path d="M8,10 Q21,6 34,10 Q34,18 21,20 Q8,18 8,10 Z" 
+        fill="#b3e5fc" 
+        fill-opacity="0.45" 
+        stroke="#0277bd" 
+        stroke-width="1.2"/>
+  
+  <!-- کف سینوس (خط پایین) -->
+  <path d="M8,18 Q21,22 34,18" 
+        fill="none" 
+        stroke="#01579b" 
+        stroke-width="1.5" 
+        stroke-linecap="round"/>
+  
+  <!-- پودر استخوان -->
+  <g fill="#ffffff" stroke="#90a4ae" stroke-width="0.4">
+    <circle cx="10" cy="22" r="1.2"/>
+    <circle cx="13" cy="22.5" r="1.3"/>
+    <circle cx="16" cy="23" r="1.4"/>
+    <circle cx="19" cy="23.2" r="1.4"/>
+    <circle cx="22" cy="23.2" r="1.4"/>
+    <circle cx="25" cy="23" r="1.4"/>
+    <circle cx="28" cy="22.5" r="1.3"/>
+    <circle cx="31" cy="22" r="1.2"/>
+    
+    <circle cx="11.5" cy="20" r="1.1"/>
+    <circle cx="14.5" cy="20.5" r="1.2"/>
+    <circle cx="17.5" cy="21" r="1.3"/>
+    <circle cx="20.5" cy="21.2" r="1.3"/>
+    <circle cx="23.5" cy="21.2" r="1.3"/>
+    <circle cx="26.5" cy="21" r="1.3"/>
+    <circle cx="29.5" cy="20.5" r="1.2"/>
+    <circle cx="32" cy="20" r="1.1"/>
+    
+    <circle cx="13" cy="18.5" r="1"/>
+    <circle cx="16" cy="19" r="1.1"/>
+    <circle cx="19" cy="19.3" r="1.2"/>
+    <circle cx="22" cy="19.3" r="1.2"/>
+    <circle cx="25" cy="19.3" r="1.2"/>
+    <circle cx="28" cy="19" r="1.1"/>
+    <circle cx="30.5" cy="18.5" r="1"/>
+    
+    <circle cx="15" cy="17" r="0.9"/>
+    <circle cx="18" cy="17.3" r="1"/>
+    <circle cx="21" cy="17.5" r="1"/>
+    <circle cx="24" cy="17.5" r="1"/>
+    <circle cx="27" cy="17.3" r="1"/>
+    <circle cx="29.5" cy="17" r="0.9"/>
+    
+    <circle cx="17" cy="15.5" r="0.8"/>
+    <circle cx="20" cy="15.8" r="0.9"/>
+    <circle cx="23" cy="15.8" r="0.9"/>
+    <circle cx="26" cy="15.5" r="0.8"/>
+    
+    <circle cx="19" cy="14" r="0.7"/>
+    <circle cx="22.5" cy="14.2" r="0.7"/>
+  </g>
+  
+  <g fill="#cfd8dc" opacity="0.7">
+    <circle cx="12" cy="21" r="0.5"/>
+    <circle cx="15.5" cy="21.8" r="0.5"/>
+    <circle cx="18.5" cy="22" r="0.5"/>
+    <circle cx="21.5" cy="22" r="0.5"/>
+    <circle cx="24.5" cy="22" r="0.5"/>
+    <circle cx="27.5" cy="21.8" r="0.5"/>
+    <circle cx="30" cy="21" r="0.5"/>
+    
+    <circle cx="14" cy="19.3" r="0.4"/>
+    <circle cx="17" cy="19.8" r="0.4"/>
+    <circle cx="20.5" cy="20" r="0.4"/>
+    <circle cx="23.5" cy="20" r="0.4"/>
+    <circle cx="26.5" cy="19.8" r="0.4"/>
+    <circle cx="29" cy="19.3" r="0.4"/>
+    
+    <circle cx="16.5" cy="16.3" r="0.4"/>
+    <circle cx="19.5" cy="16.5" r="0.4"/>
+    <circle cx="22.5" cy="16.5" r="0.4"/>
+    <circle cx="25.5" cy="16.3" r="0.4"/>
+  </g>
+</g>
+
+
+
+<g id="night-guard" data-active="0" data-treatment="night-guard">
+  <!-- بدنه نایت‌گارد روی کل تاج دندان آسیاب (پهن‌تر) -->
+  <path d="M8,32 
+           C7,42 6,52 7,58 
+           C8,62 12,64 19.5,64 
+           C27,64 31,62 32,58 
+           C33,52 32,42 31,32 
+           C30,30 27,29 19.5,29 
+           C12,29 9,30 8,32 Z" 
+        fill="#4dd0e1" 
+        fill-opacity="0.35" 
+        stroke="#00acc1" 
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+  
+  <!-- خط لبه بالایی (خط لثه) -->
+  <path d="M8,32 C9,30 12,29 19.5,29 C27,29 30,30 31,32" 
+        fill="none" 
+        stroke="#006064" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <!-- خط لبه پایینی (سطح جونده) -->
+  <path d="M7,58 C8,62 12,64 19.5,64 C27,64 31,62 32,58" 
+        fill="none" 
+        stroke="#006064" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <!-- خط میانی (سطح اکلوزال) -->
+  <path d="M7.5,48 C12,50 27,50 31.5,48" 
+        fill="none" 
+        stroke="#00838f" 
+        stroke-width="1" 
+        stroke-dasharray="3,2" 
+        opacity="0.8"/>
+  
+  <!-- بازتاب نور ۱ -->
+  <path d="M11,38 C11.5,36 13,34.5 15,34" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        opacity="0.85"/>
+  
+  <!-- بازتاب نور ۲ -->
+  <path d="M11.5,50 C12,48 13,46.5 14,45.5" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="1.3" 
+        stroke-linecap="round" 
+        opacity="0.6"/>
+  
+  <!-- ذرات براق -->
+  <circle cx="19.5" cy="40" r="1" fill="#ffffff" opacity="0.5"/>
+  <circle cx="24" cy="45" r="0.7" fill="#ffffff" opacity="0.4"/>
+  <circle cx="15" cy="43" r="0.7" fill="#ffffff" opacity="0.4"/>
+</g>
+<g id="tmj-treatment" data-active="0" data-treatment="tmj-treatment">
+  <!-- هاله نمادین TMJ روی کل تاج دندان مولر -->
+  <path id="tmj-splint-overlay" 
+        d="مسیر tooth-base دندان 16" 
+        data-active="1" 
+        style="fill: #7b2ff7; fill-opacity: 0.25; stroke: #7b2ff7; stroke-width: 0.8; stroke-dasharray: 3,2; stroke-miterlimit: 10; pointer-events: none;">
+  </path>
+  
+  <!-- برچسب TMJ روی تاج -->
+  <text x="19.5" y="35" 
+        font-family="Arial, sans-serif" 
+        font-size="4" 
+        font-weight="bold" 
+        fill="#7b2ff7" 
+        text-anchor="middle" 
+        opacity="0.9"
+        data-active="1">
+    TMJ
+  </text>
+</g>
+<g id="gingival-graft1" data-active="0" data-treatment="gingival-graft1">
+  <ellipse cx="20.5" cy="24" rx="11" ry="5.5" 
+           fill="#ffcdd2" fill-opacity="0.5" stroke="#c62828" 
+           stroke-width="1.2" stroke-dasharray="4,2"/>
+  
+  <path d="M10,26 Q14,22.5 20.5,22.5 Q27,22.5 31,26 Q32,28 31,30.5 Q27,33 20.5,33 Q14,33 10,30.5 Q9,28 10,26 Z" 
+        fill="#f8bbd0" fill-opacity="0.85" stroke="#c2185b" stroke-width="1.2"/>
+  
+  <path d="M12.5,27 Q16,24.5 20.5,24.5 Q25,24.5 28.5,27 Q30,28 28.5,30.5 Q25,32 20.5,32 Q16,32 12.5,30.5 Q11,28 12.5,27 Z" 
+        fill="#ec407a" fill-opacity="0.6" stroke="#880e4f" stroke-width="0.8"/>
+  
+  <line x1="15" y1="25.5" x2="15" y2="31.5" stroke="#4a0024" stroke-width="0.7" stroke-dasharray="2,1"/>
+  <line x1="20.5" y1="25" x2="20.5" y2="32" stroke="#4a0024" stroke-width="0.7" stroke-dasharray="2,1"/>
+  <line x1="26" y1="25.5" x2="26" y2="31.5" stroke="#4a0024" stroke-width="0.7" stroke-dasharray="2,1"/>
+  
+  <circle cx="15" cy="25.5" r="0.6" fill="#4a0024"/>
+  <circle cx="15" cy="31.5" r="0.6" fill="#4a0024"/>
+  <circle cx="20.5" cy="25" r="0.6" fill="#4a0024"/>
+  <circle cx="20.5" cy="32" r="0.6" fill="#4a0024"/>
+  <circle cx="26" cy="25.5" r="0.6" fill="#4a0024"/>
+  <circle cx="26" cy="31.5" r="0.6" fill="#4a0024"/>
+  
+  <path d="M14,28 Q20.5,26.5 27,28" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+</g>
+<g id="prosthesis-repair" data-active="0" data-treatment="prosthesis-repair">
+  <!-- ناحیه تعمیر پروتز روی تاج دندان -->
+  <path d="M13,40 
+           Q19.5,37 26,40 
+           Q27,50 26,58 
+           Q22,61 19.5,61 
+           Q17,61 13,58 
+           Q12,50 13,40 Z" 
+        fill="#ffcc80" 
+        fill-opacity="0.7" 
+        stroke="#e65100" 
+        stroke-width="1.5"/>
+  
+  <!-- خطوط اتصال ترمیم (افقی) -->
+  <line x1="13" y1="45" x2="26" y2="45" 
+        stroke="#bf360c" stroke-width="1" stroke-dasharray="2,1.5"/>
+  <line x1="13" y1="50" x2="26" y2="50" 
+        stroke="#bf360c" stroke-width="1" stroke-dasharray="2,1.5"/>
+  <line x1="13" y1="55" x2="26" y2="55" 
+        stroke="#bf360c" stroke-width="1" stroke-dasharray="2,1.5"/>
+  
+  <!-- نقاط اتصال (پرچ) -->
+  <circle cx="15" cy="45" r="1" fill="#bf360c"/>
+  <circle cx="24" cy="45" r="1" fill="#bf360c"/>
+  <circle cx="15" cy="50" r="1" fill="#bf360c"/>
+  <circle cx="24" cy="50" r="1" fill="#bf360c"/>
+  <circle cx="15" cy="55" r="1" fill="#bf360c"/>
+  <circle cx="24" cy="55" r="1" fill="#bf360c"/>
+  
+  <!-- درخشش ترمیم (نشان‌دهنده نو بودن) -->
+  <path d="M15,42 Q19.5,40 24,42" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="1.5" 
+        stroke-linecap="round" 
+        opacity="0.7"/>
+</g>
+<g id="smile-design" data-active="0" data-treatment="smile-design">
+  <!-- خطوط طراحی (نسبت طلایی) -->
+  <line x1="21.5" y1="28" x2="21.5" y2="66" 
+        stroke="#ffb300" 
+        stroke-width="0.8" 
+        stroke-dasharray="3,2" 
+        opacity="0.8"/>
+  
+  <!-- خط افقی طراحی -->
+  <line x1="8" y1="50" x2="35" y2="50" 
+        stroke="#ffb300" 
+        stroke-width="0.8" 
+        stroke-dasharray="3,2" 
+        opacity="0.8"/>
+  
+  <!-- قوس لبخند (منحنی) -->
+  <path d="M8,58 
+           Q21.5,70 35,58" 
+        fill="none" 
+        stroke="#ffb300" 
+        stroke-width="1.2" 
+        stroke-linecap="round" 
+        opacity="0.9"/>
+  
+  <!-- نشانگرهای طراحی (نقاط) -->
+  <circle cx="21.5" cy="28" r="1.2" fill="#ffb300"/>
+  <circle cx="21.5" cy="50" r="1" fill="#ffb300"/>
+  <circle cx="21.5" cy="66" r="1.2" fill="#ffb300"/>
+  <circle cx="8" cy="50" r="1" fill="#ffb300"/>
+  <circle cx="35" cy="50" r="1" fill="#ffb300"/>
+  
+  <!-- خطوط نسبت (نسبت طلایی) -->
+  <path d="M11,35 Q21.5,33 32,35" 
+        fill="none" 
+        stroke="#ffb300" 
+        stroke-width="0.8" 
+        opacity="0.6"/>
+  <path d="M11,42 Q21.5,40 32,42" 
+        fill="none" 
+        stroke="#ffb300" 
+        stroke-width="0.8" 
+        opacity="0.6"/>
+  
+  <!-- ناحیه طراحی (شفاف) -->
+  <path d="M11,33 
+           Q10,45 10,55 
+           Q10.5,62 18,63 
+           L25,63 
+           Q32.5,62 33,55 
+           Q33,45 32,33 
+           Q30,31 21.5,31 
+           Q13,31 11,33 Z" 
+        fill="#ffb300" 
+        fill-opacity="0.08" 
+        stroke="none"/>
+</g>
   </svg>

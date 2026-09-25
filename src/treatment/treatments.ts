@@ -38,7 +38,7 @@ export const TREATMENTS: TreatmentItem[] = [
   // ═══════════════════════════════════════════════
   // ۲. پیشگیری — Prevention
   // ═══════════════════════════════════════════════
-  { id: "scaling-polishing",      label: "جرم‌گیری و بروساژ",       category: "prevention", icon: "sparkles",     defaultPrice: 500000 },
+  { id: "scaling-polishing1",      label: "جرم‌گیری و بروساژ",       category: "prevention", icon: "sparkles",     defaultPrice: 500000 },
   { id: "fluoride-therapy",       label: "فلورایدتراپی",            category: "prevention", icon: "shield",       defaultPrice: 300000 },
   { id: "sealant-prevention",     label: "فیشور سیلانت",            category: "prevention", icon: "shield-check", defaultPrice: 250000 },
   { id: "oral-hygiene-education", label: "آموزش بهداشت دهان",       category: "prevention", icon: "book-open",    defaultPrice: 100000 },
@@ -132,7 +132,7 @@ export const TREATMENTS: TreatmentItem[] = [
   { id: "curettage",                 label: "کورتاژ لثه",                category: "perio", icon: "scissors",   defaultPrice: 1500000 },
   { id: "root-planing",              label: "Root Planing",              category: "perio", icon: "sparkles",   defaultPrice: 1800000 },
   { id: "flap-surgery",              label: "جراحی فلپ لثه",              category: "perio", icon: "scissors",   defaultPrice: 4000000 },
-  { id: "gingival-graft",            label: "پیوند لثه",                  category: "perio", icon: "bone",       defaultPrice: 5000000 },
+  { id: "gingival-graft1",            label: "پیوند لثه",                  category: "perio", icon: "bone",       defaultPrice: 5000000 },
   { id: "keratinized-gum-graft",     label: "کراتین گام گرافت",           category: "perio", icon: "bone",       defaultPrice: 4500000 },
   { id: "frenectomy-perio",          label: "فرنکتومی",                   category: "perio", icon: "scissors",   defaultPrice: 2500000 },
   { id: "gingivectomy",              label: "ژینجیوکتومی",                category: "perio", icon: "scissors",   defaultPrice: 3000000 },

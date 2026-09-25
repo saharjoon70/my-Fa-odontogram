@@ -469,6 +469,12 @@ export function treatmentToPatchPreview(
 const CUSTOM_SVG_TREATMENTS = [
   "sinus-lift",
   "bone-graft",
+  "night-guard",
+  "scaling-polishing1",
+  "tmj-treatment",
+  "gingival-graft1",
+  "prosthesis-repair",
+  "smile-design"
   // هر سرویس دیگری که SVG سفارشی دارد
 ];
 

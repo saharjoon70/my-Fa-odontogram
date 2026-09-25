@@ -1495,7 +1495,10 @@ function setPulpInflamPaths(svg: Any, active: boolean){
 // ---- SVG apply logic ----
 function applyStateToSvgSingle(toothNo: Any, svg: Any, state: Any = toothState.get(toothNo)){
   if(!state || !svg) return;
-
+console.log("[applyStateToSvgSingle]", toothNo,
+  "customStates:", JSON.stringify(state.customStates),
+  "isMap:", state.customStates instanceof Map,
+  "keys:", Object.keys(state.customStates || {}));
   // 0) Start from a clean baseline: turn OFF all switchables, then apply ON flags.
   // (Base stays as in SVG; we don't toggle #base)
   const switchable = ["mods","tooth-variants","endos","surfaces","restorations","tooth"];
@@ -3315,10 +3318,16 @@ export function setToothStateAndRender(
   const s = toothState.get(toothNo);
   if (!s) return;
   
-  // Merge patch into state (با تبدیل Set/Map)
   for (const [key, value] of Object.entries(patch)) {
     if (Array.isArray(value) && s[key] instanceof Set) {
       s[key] = new Set(value);
+    }
+    // ⭐ این را اضافه کنید:
+    else if (key === "customStates" && typeof value === "object" && value !== null) {
+      s.customStates = {
+        ...(s.customStates || {}),
+        ...(value as Record<string, unknown>),
+      };
     }
     else if (value && typeof value === 'object' && !Array.isArray(value) && s[key] instanceof Map) {
       s[key] = new Map(Object.entries(value));
@@ -3328,10 +3337,8 @@ export function setToothStateAndRender(
     }
   }
   
-  // رندر مجدد SVG با applyStateToSvg
   applyStateToSvg(toothNo);
   
-  // ═══ لایه‌های اضافی که applyStateToSvg پوشش نمی‌ده ═══
   const roots = toothSvgRoot.get(toothNo);
   if (roots) {
     for (const svg of roots) {
