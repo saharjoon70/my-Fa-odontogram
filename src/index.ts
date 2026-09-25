@@ -1,9 +1,30 @@
+// src/index.ts
+// Library entry — export همه چیز برای استفاده در بیرون
+
 import "./index.css";
 
+// ═══════════════════════════════════════════════
+// کامپوننت اصلی
+// ═══════════════════════════════════════════════
 import OdontogramShell from "./App.vue";
-
 export default OdontogramShell;
 export { OdontogramShell };
+
+// ═══════════════════════════════════════════════
+// لایه‌ی درمان (پوشه جدید src/treatment/)
+// ═══════════════════════════════════════════════
+export * from "./treatment";
+
+// ═══════════════════════════════════════════════
+// Engine API (از odontogram.ts)
+// ═══════════════════════════════════════════════
+export {
+  getSelectedTeeth,
+  setSelectedTeeth,
+  onSelectionChange,
+  setToothStateAndRender,
+  getToothState,
+} from "./odontogram";
 
 export {
   clearSelection,
@@ -44,9 +65,12 @@ export {
   exportSvg,
   setImportFormat,
   exportStatus,
-  importStatus
+  importStatus,
 } from "./odontogram";
 
+// ═══════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════
 export type {
   PulpDetailLevel,
   SecondaryCariesMode,
@@ -59,10 +83,19 @@ export type {
 } from "./odontogram";
 
 export type { FhirExportOptions } from "./fhir/types";
-export { startIntroTour } from "./tour";
 export type { OdontogramThemeConfig } from "./theme";
 export type { OdontogramPlugin, PluginLayer } from "./plugin";
 export type { SettingsState } from "./settingsModal";
-export { SETTINGS_TABS } from "./settingsModal";
 
-export { t, getI18nLanguage, setI18nLanguage, onI18nChange, useI18n } from "./i18n/useI18n";
+// ═══════════════════════════════════════════════
+// ابزارهای جانبی
+// ═══════════════════════════════════════════════
+export { startIntroTour } from "./tour";
+export { SETTINGS_TABS } from "./settingsModal";
+export {
+  t,
+  getI18nLanguage,
+  setI18nLanguage,
+  onI18nChange,
+  useI18n,
+} from "./i18n/useI18n";

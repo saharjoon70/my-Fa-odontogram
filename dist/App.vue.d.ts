@@ -22,6 +22,8 @@ type __VLS_Props = {
     surfaceNotation?: SurfaceNotation;
     showStatusCard?: boolean;
     showOrthoCard?: boolean;
+    /** شناسه بیمار فعلی — برای ذخیره‌سازی رکوردها */
+    patientId?: string;
 };
 declare const __VLS_export: import('vue').DefineComponent<__VLS_Props, {}, {}, {}, {}, import('vue').ComponentOptionsMixin, import('vue').ComponentOptionsMixin, {
     languageChange: (lang: Language) => any;
@@ -32,6 +34,9 @@ declare const __VLS_export: import('vue').DefineComponent<__VLS_Props, {}, {}, {
     onNumberingChange?: (system: NumberingSystem) => any;
     onDarkModeChange?: (dark: boolean) => any;
 }>, {
+    patientId: string;
+    language: Language;
+    numberingSystem: NumberingSystem;
     readOnly: boolean;
     enableNotes: boolean;
     enableIcdas: boolean;

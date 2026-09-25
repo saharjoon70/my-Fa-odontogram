@@ -13,6 +13,7 @@ import {
   composeRestorationLayers, restorationOptions, isValidRestoration, RESTORATION_MATRIX,
   type RestorationType, type RestorationMaterial,
 } from "./registry/restorations";
+
 import {
   renderBridgeOverlay,
   detectBridgeSpans,
@@ -1668,6 +1669,33 @@ function applyStateToSvgSingle(toothNo: Any, svg: Any, state: Any = toothState.g
     setActive(svgGetById(svg, "tooth-crownprep"), true);
   }
   if(state.toothSelection === "none" && state.extractionWound){
+      // ═══ لایه‌های تشخیصی که توی خود SVG هستن ولی کد فعالشون نبود ═══
+  
+  // شکستگی عمودی/افقی
+  if(state.customStates?.fractureVertical) {
+    setActive(svgGetById(svg, "fracture-vertical"), true);
+  }
+  if(state.customStates?.fractureHorizontal) {
+    setActive(svgGetById(svg, "fracture-horizontal"), true);
+  }
+  
+  // فقدان تماس
+  if(state.contactMesial) {
+    setActive(svgGetById(svg, "mesial-no-contact-point"), true);
+  }
+  if(state.contactDistal) {
+    setActive(svgGetById(svg, "distal-no-contact-point"), true);
+  }
+  
+  // تعویض روکش
+  if(state.crownReplace) {
+    setActive(svgGetById(svg, "crown-replace-shape"), true);
+  }
+  
+  // پوسیدگی زیر تاج (وقتی روکش نیست)
+  if(state.caries.has("caries-subcrown") && !hasCrown) {
+    setActive(svgGetById(svg, "caries-subcrown"), true);
+  }
     setActive(svgGetById(svg, "no-tooth-after-extraction"), true);
   }
 
@@ -1932,13 +1960,15 @@ function applyStateToSvgSingle(toothNo: Any, svg: Any, state: Any = toothState.g
     // defect-{surface} marker on a filled surface with a recorded defect. Generic
     // marker (type lives in the data / summary), no opacity. Independent of
     // secondary caries (both may be active on the same surface).
-    if(state.fillingDefect && state.fillingDefect.size > 0 && !hasCrown){
-      for(const [s, val] of state.fillingDefect){
-        if(val && val !== "none" && state.fillingSurfaceMaterials.has(s)){
-          setActive(svgGetById(svg, `defect-${s}`), true);
-        }
-      }
+
+    // SP10: per-surface filling defect — دیگه نیازی به fillingSurfaceMaterials نیست
+if(state.fillingDefect && state.fillingDefect.size > 0 && !hasCrown){
+  for(const [s, val] of state.fillingDefect){
+    if(val && val !== "none"){
+      setActive(svgGetById(svg, `defect-${s}`), true);
     }
+  }
+}
 
   }
 
@@ -1982,8 +2012,19 @@ function applyStateToSvgSingle(toothNo: Any, svg: Any, state: Any = toothState.g
       }
     }
   }
+// ⭐ لایه‌های سفارشی — همه [data-treatment] را toggle کن
+// ⭐ لایه‌های سفارشی — از روش * استفاده کن (نه [data-treatment])
+const activeTreatments = (state.customStates?.activeTreatments as string[]) ?? [];
+const allSvgElements = svg.querySelectorAll("*");
+for (let i = 0; i < allSvgElements.length; i++) {
+  const layer = allSvgElements[i];
+  const tid = layer.getAttribute && layer.getAttribute("data-treatment");
+  if (tid) {
+    setActive(layer, activeTreatments.includes(tid));
+  }
+}
 
-  updateWarnings(state);
+updateWarnings(state);
 }
 
 function applyStateToSvg(toothNo: Any){
@@ -3019,7 +3060,10 @@ function syncControlsFromState(state: Any){
   if(inflammationLabel){
     inflammationLabel.textContent = extraction ? t("mods.periodontalInflammation") : t("mods.periapicalInflammation");
   }
-  $("#mobilityRow").classList.toggle("hidden", mobilityRowHidden(state));
+  const mobilityRow = $("#mobilityRow");
+  if(mobilityRow){
+    mobilityRow.classList.toggle("hidden", mobilityRowHidden(state));
+  }
   const parodontalInput = $("#chk-parodontal");
   if(parodontalInput){
     setDisabled(parodontalInput, extraction);
@@ -3237,6 +3281,181 @@ function refreshLocalizedContent(){
     syncControlsFromState(toothState.get(activeTooth));
   }
 }
+// ---- Selection change subscription ----
+// ---- Selection change subscription ----
+const selectionChangeListeners = new Set<(teeth: number[]) => void>();
+
+export function onSelectionChange(cb: (teeth: number[]) => void): () => void {
+  selectionChangeListeners.add(cb);
+  return () => { selectionChangeListeners.delete(cb); };
+}
+
+function notifySelectionChange() {
+  const teeth = Array.from(selectedTeeth) as number[];
+  console.log("notifySelectionChange called with:", teeth);  // ← برای دیباگ
+  for (const cb of selectionChangeListeners) {
+    try { cb(teeth); } catch (e) { console.error(e); }
+  }
+}
+export function getSelectedTeeth(): number[] {
+  return Array.from(selectedTeeth) as number[];
+}
+/** 
+ * ست کردن state یه دندون + رندر مجدد SVG.
+ * برای preview و apply درمان از این استفاده کن.
+ */
+/** 
+ * ست کردن state یه دندون + رندر مجدد SVG.
+ * برای preview و apply درمان از این استفاده کن.
+ */
+export function setToothStateAndRender(
+  toothNo: number,
+  patch: Record<string, unknown>
+): void {
+  const s = toothState.get(toothNo);
+  if (!s) return;
+  
+  // Merge patch into state (با تبدیل Set/Map)
+  for (const [key, value] of Object.entries(patch)) {
+    if (Array.isArray(value) && s[key] instanceof Set) {
+      s[key] = new Set(value);
+    }
+    else if (value && typeof value === 'object' && !Array.isArray(value) && s[key] instanceof Map) {
+      s[key] = new Map(Object.entries(value));
+    }
+    else {
+      s[key] = value;
+    }
+  }
+  
+  // رندر مجدد SVG با applyStateToSvg
+  applyStateToSvg(toothNo);
+  
+  // ═══ لایه‌های اضافی که applyStateToSvg پوشش نمی‌ده ═══
+  const roots = toothSvgRoot.get(toothNo);
+  if (roots) {
+    for (const svg of roots) {
+      applyExtraLayers(svg, s);
+    }
+  }
+  
+  updateToothTileNumber(toothNo);
+}
+
+/** 
+ * لایه‌های تشخیصی که توی applyStateToSvg نیستن (شکستگی، splint، نشت مارجینال، ...)
+ */
+function applyExtraLayers(svg: Element, state: Any): void {
+  // ─── شکستگی عمودی ───
+  if (state.customStates?.fractureVertical) {
+    setActive(svgGetById(svg, "fracture-vertical"), true);
+  } else {
+    setActive(svgGetById(svg, "fracture-vertical"), false);
+  }
+  
+  // ─── شکستگی افقی ───
+  if (state.customStates?.fractureHorizontal) {
+    setActive(svgGetById(svg, "fracture-horizontal"), true);
+  } else {
+    setActive(svgGetById(svg, "fracture-horizontal"), false);
+  }
+  
+  // ─── فقدان تماس مزیال ───
+  setActive(svgGetById(svg, "mesial-no-contact-point"), !!state.contactMesial);
+  
+  // ─── فقدان تماس دیستال ───
+  setActive(svgGetById(svg, "distal-no-contact-point"), !!state.contactDistal);
+  
+  // ─── تعویض روکش ───
+  setActive(svgGetById(svg, "crown-replace-shape"), !!state.crownReplace);
+  
+  // ─── نیاز به روکش ───
+  setActive(svgGetById(svg, "crown-needed-shape"), !!state.crownNeeded);
+  setActive(svgGetById(svg, "crown-needed-path"), !!state.crownNeeded);
+  
+  // ─── پوسیدگی زیر تاج (وقتی روکش نیست) ───
+  if (state.caries?.has("caries-subcrown") && state.restorationType === "none") {
+    setActive(svgGetById(svg, "caries-subcrown"), true);
+  }
+  
+  // ─── نشت مارجینال روکش (فقط وقتی روکش هست) ───
+  if (state.crownLeakage && (state.restorationType === "crown" || state.restorationType === "bridge")) {
+    setActive(svgGetById(svg, "crown-leakage"), true);
+  } else {
+    setActive(svgGetById(svg, "crown-leakage"), false);
+  }
+  
+  // ─── پارسیل / دنچر (وقتی toothSelection === "none") ───
+  if (state.toothSelection === "none" && 
+      (state.prosthesis === "removable-partial" || state.prosthesis === "removable-full")) {
+    setActive(svgGetById(svg, "prosthesis"), true);
+    setActive(svgGetById(svg, "prosthesis-crown"), true);
+    setActive(svgGetById(svg, "prosthesis-connector"), true);
+  }
+}
+/** 
+ * خوندن state یه دندون.
+ */
+export function getToothState(toothNo: number): Record<string, unknown> | null {
+  const s = toothState.get(toothNo);
+  if (!s) return null;
+  // Return a plain object (convert Maps/Sets)
+  return {
+    toothSelection: s.toothSelection,
+    restorationType: s.restorationType,
+    restorationMaterial: s.restorationMaterial,
+    prosthesis: s.prosthesis,
+    endo: s.endo,
+    pulpDx: s.pulpDx,
+    apicalDx: s.apicalDx,
+    fillingMaterial: s.fillingMaterial,
+    fillingSurfaces: Array.from(s.fillingSurfaces || []),
+    fillingSurfaceMaterials: Object.fromEntries(s.fillingSurfaceMaterials || new Map()),
+    caries: Array.from(s.caries || []),
+    cariesSeverity: Object.fromEntries(s.cariesSeverity || new Map()),
+    rootCaries: s.rootCaries,
+    wearEdge: s.wearEdge,
+    wearCervical: s.wearCervical,
+    discoloration: s.discoloration,
+    orthoAppliance: s.orthoAppliance,
+    orthoDrift: s.orthoDrift,
+    orthoVertical: s.orthoVertical,
+    orthoRotation: s.orthoRotation,
+    mobility: s.mobility,
+    calculus: s.calculus,
+    crownNeeded: s.crownNeeded,
+    crownReplace: s.crownReplace,
+    extractionPlan: s.extractionPlan,
+    extractionWound: s.extractionWound,
+    missingClosed: s.missingClosed,
+    bridgePillar: s.bridgePillar,
+    toothSubstrate: s.toothSubstrate,
+    endoResection: s.endoResection,
+    resorptionType: s.resorptionType,
+    periImplant: s.periImplant,
+    fissureSealing: s.fissureSealing,
+    contactMesial: s.contactMesial,
+    contactDistal: s.contactDistal,
+    brokenMesial: s.brokenMesial,
+    brokenIncisal: s.brokenIncisal,
+    brokenDistal: s.brokenDistal,
+    parapulpalPin: s.parapulpalPin,
+    periapicalType: s.periapicalType,
+  };
+}
+export function setSelectedTeeth(toothNos: number[]): void {
+  selectedTeeth = new Set(toothNos);
+  activeTooth = toothNos.length > 0 ? toothNos[0] : null;
+  updateSelectionUI();
+}
+
+export function clearSelection(): void {
+  selectedTeeth = new Set();
+  activeTooth = null;
+  updateSelectionUI();
+}
+
+
 
 function updateSelectionUI(){
   $$(".tooth-tile").forEach(tile => {
@@ -3254,8 +3473,8 @@ function updateSelectionUI(){
     syncControlsFromState(defaultState());
     setControlsEnabled(false);
   }
+  notifySelectionChange();  // ← این خط اضافه شد
 }
-
 // ---- Touch: Zoom Popover ----
 function showZoomPopover(toothNo: number){
   hideZoomPopover();
@@ -3848,24 +4067,17 @@ function addTouchToTile(tile: HTMLElement, toothNo: number){
 
 function onToothClick(toothNo: Any, evt: Any){
   if(readOnly) return;
-  const multi = evt.metaKey || evt.ctrlKey;
-  if(multi){
-    if(selectedTeeth.has(toothNo)){
-      selectedTeeth.delete(toothNo);
-    }else{
-      selectedTeeth.add(toothNo);
-      activeTooth = toothNo;
+  if(selectedTeeth.has(toothNo)){
+    selectedTeeth.delete(toothNo);
+    if(activeTooth === toothNo){
+      activeTooth = selectedTeeth.values().next().value ?? null;
     }
   }else{
-    selectedTeeth = new Set([toothNo]);
+    selectedTeeth.add(toothNo);
     activeTooth = toothNo;
-  }
-  if(activeTooth && !selectedTeeth.has(activeTooth)){
-    activeTooth = selectedTeeth.values().next().value ?? null;
   }
   updateSelectionUI();
 }
-
 // ---- Keyboard accessibility ----
 const NAV_ROWS = [
   [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],
@@ -4560,14 +4772,59 @@ function hydrateState(raw: Any, inferLegacySecondaryCaries = true){
   // Restore note
   if(typeof raw.note === "string") s.note = raw.note;
   // Restore plugin custom states (only for registered plugin IDs)
-  if(raw.customStates && typeof raw.customStates === "object"){
-    const validIds = new Set(registeredPlugins.map(p => p.id));
-    for(const [key, val] of Object.entries(raw.customStates)){
-      if(validIds.has(key)){
-        s.customStates[key] = val;
-      }
+  // if(raw.customStates && typeof raw.customStates === "object"){
+  //   const validIds = new Set(registeredPlugins.map(p => p.id));
+  //   for(const [key, val] of Object.entries(raw.customStates)){
+  //     if(validIds.has(key)){
+  //       s.customStates[key] = val;
+  //     }
+  //   }
+  // }
+
+
+// کلیدهای clinical که در customStates ذخیره می‌شوند
+const CLINICAL_CUSTOM_KEYS = new Set([
+  "plaque",
+  "bleedingOnProbing",
+  "gingivalRecession",
+  "periodontalPocket",
+  "suppuration",
+  "paleGum",
+  "cracked",
+  "congenitalMissing",
+  "partiallyErupted",
+  "secondaryCaries",
+  "bruxism",
+  "sensitivity",
+  "pain",
+  "swelling",
+  "fistula",
+  "trauma",
+  "bleedingOnBrushing",
+  "crowding",
+  "diastema",
+  "crossbite",
+  "removableRetainer",
+  "spaceMaintainer",
+  "occlusalSplint",
+  "periodontalSplint",
+  "fractureVertical",
+  "fractureHorizontal",
+]);
+
+function isClinicalCustomKey(key: string): boolean {
+  return CLINICAL_CUSTOM_KEYS.has(key);
+}
+  // Restore plugin custom states — هم پلاگین‌ها هم clinical states
+if (raw.customStates && typeof raw.customStates === "object") {
+  const validPluginIds = new Set(registeredPlugins.map((p) => p.id));
+  for (const [key, val] of Object.entries(raw.customStates)) {
+    // یا پلاگین ثبت‌شده است یا کلید clinical است
+    if (validPluginIds.has(key) || key.startsWith("clinical") || isClinicalCustomKey(key)) {
+      s.customStates[key] = val;
     }
   }
+}
   return s;
 }
 
@@ -5227,40 +5484,40 @@ export function setImportFormat(format: "status" | "fhir"){
 }
 
 // ---- Controls wiring ----
+// ---- Controls wiring ----
+// ---- Controls wiring ----
 function wireControls(){
-  // Collapse toggles and the global visibility toggles use delegated listeners
-  // with stable function references, so addEventListener de-duplicates them.
-  // Register on every init because destroyOdontogram removes them; the DOM
-  // guarantees only one live listener each. These handle the `setX(!current)`
-  // toggles that would otherwise cancel themselves out under React StrictMode's
-  // double mount-effect (which re-wires anonymous listeners onto the same nodes).
   document.addEventListener("click", onCardToggleClick);
   document.addEventListener("click", onGlobalToggleClick);
-  // Note: buildChecks/buildSurfaceCross/buildSelect below self-clear and create
-  // fresh nodes, so re-running wireControls per init is safe; destroyOdontogram
-  // empties those containers and they are rebuilt here.
   if(controlsWired) return;
   controlsWired = true;
+
+  // Helper: wire only if element exists
+  function wire(selector: string, event: string, handler: (e: any) => void) {
+    const node = document.querySelector(selector);
+    if (node) node.addEventListener(event, handler);
+  }
+
+  function wireSelect(selector: string, optionsFn: () => { value: any; label: string }[], handler: (value: string) => void) {
+    const node = document.querySelector(selector);
+    if (node) buildSelect(node, optionsFn(), handler);
+  }
+
   const iconButtons = ["btnOcclView","btnWisdomVisible","btnBoneVisible","btnPulpVisible"];
   iconButtons.forEach((id)=>{
     const btn = $(`#${id}`);
     if(btn) loadInlineIcon(btn).then(()=>syncIconXLine(btn));
   });
 
-  // Tooth base dropdown
-  buildSelect($("#toothSelect"), getToothSelectOptions(), (value)=>{
+  wireSelect("#toothSelect", getToothSelectOptions, (value)=>{
     applyToSelected((s, toothNo)=>{
-      if(value === "milktooth" && MILKTOOTH_BLOCKED.has(toothNo)){
-        return;
-      }
+      if(value === "milktooth" && MILKTOOTH_BLOCKED.has(toothNo)) return;
       const next = defaultState();
       next.toothSelection = value;
       if(!["tooth-base","milktooth","implant","tooth-under-gum"].includes(value)){
         next.extractionPlan = false;
       }
-      if(value !== "none"){
-        next.extractionWound = false;
-      }
+      if(value !== "none"){ next.extractionWound = false; }
       if(value === "implant" || value === "none"){
         next.caries.clear();
         next.endo = "none";
@@ -5273,8 +5530,7 @@ function wireControls(){
     if(value !== "none") setEdentulous(false);
   });
 
-  // Substrate dropdown (tooth condition: natural / radix / broken / crown-prep)
-  buildSelect($("#substrateSelect"), getSubstrateOptions(), (value)=>{
+  wireSelect("#substrateSelect", getSubstrateOptions, (value)=>{
     applyToSelected((s)=>{
       s.toothSubstrate = value;
       if(value !== "broken"){
@@ -5282,7 +5538,6 @@ function wireControls(){
         s.brokenIncisal = false;
         s.brokenDistal = false;
       }
-      // crown-needed only applies while a natural/broken/prepared tooth is unrestored
       if(!["natural","broken","crownprep"].includes(value) || s.restorationType !== "none"){
         s.crownNeeded = false;
       }
@@ -5290,130 +5545,93 @@ function wireControls(){
     setEdentulous(false);
   });
 
-  // Combined restoration dropdown (crown / inlay / onlay / veneer / bridge ×
-  // material). Value encodes `${type}|${material}` and writes BOTH fields.
-  // At initial wiring there is no active tooth yet (options get narrowed by
-  // syncControlsFromState/refreshAllSelectOptions once one is selected), but
-  // thread ctx consistently in case activeTooth is already set (e.g. re-wire).
-  const initialToothState = activeTooth ? toothState.get(activeTooth) : null;
-  buildSelect($("#restorationSelect"), getRestorationOptions("occlusal", { isImplant: initialToothState?.toothSelection === "implant", toothSelection: initialToothState?.toothSelection }), (value)=>{
-    const v = String(value);
-    applyToSelected((s)=>{ applyRestorationSelection(s, v); });
-    setEdentulous(false);
-  });
-
-  // SP7 Task 4: merged pulp/endo status. Custom-built (optgroups) rather than
-  // via buildSelect; the change handler routes to pulpEndoOnSelect, which
-  // enforces the mutual-exclusion invariant (endo <-> vital pulpDx).
   {
-    const sel = $("#pulpEndoSelect");
-    sel.addEventListener("change", () => {
-      const value = sel.value;
-      applyToSelected((s)=>{ pulpEndoOnSelect(s, value); });
-    });
+    const node = document.querySelector("#restorationSelect");
+    if (node) {
+      const initialToothState = activeTooth ? toothState.get(activeTooth) : null;
+      buildSelect(node, getRestorationOptions("occlusal", { isImplant: initialToothState?.toothSelection === "implant", toothSelection: initialToothState?.toothSelection }), (value)=>{
+        const v = String(value);
+        applyToSelected((s)=>{ applyRestorationSelection(s, v); });
+        setEdentulous(false);
+      });
+    }
   }
 
-  // Apical (AAE) diagnosis
-  buildSelect($("#apicalDxSelect"), getApicalDxOptions(), (value)=>{
+  wire("#pulpEndoSelect", "change", () => {
+    const sel = document.querySelector("#pulpEndoSelect") as HTMLSelectElement | null;
+    if (!sel) return;
+    const value = sel.value;
+    applyToSelected((s)=>{ pulpEndoOnSelect(s, value); });
+  });
+
+  wireSelect("#apicalDxSelect", getApicalDxOptions, (value)=>{
     applyToSelected((s)=>{
       s.apicalDx = value;
-      // SP7: granuloma/cyst is a refinement of apical periodontitis only.
       if(value !== "symptomatic-apical-periodontitis" && value !== "asymptomatic-apical-periodontitis"){
         s.periapicalType = "none";
       }
     });
   });
 
-  // Resection
-  $("#endoResection").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.endoResection = (e.target as HTMLInputElement).checked;
-    });
+  wire("#endoResection", "change", (e)=>{
+    applyToSelected((s)=>{ s.endoResection = e.target.checked; });
   });
 
-  // Parapulpal pin
-  $("#parapulpalPin").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.parapulpalPin = (e.target as HTMLInputElement).checked;
-    });
+  wire("#parapulpalPin", "change", (e)=>{
+    applyToSelected((s)=>{ s.parapulpalPin = e.target.checked; });
   });
 
-  // Root resorption (SP4 Task 5: resorptionType enum — none / internal /
-  // external-cervical picker; both subtypes render identically).
-  buildSelect($("#resorptionSelect"), getResorptionOptions(), (value)=>{
+  wireSelect("#resorptionSelect", getResorptionOptions, (value)=>{
     applyToSelected((s)=>{ s.resorptionType = value; });
   });
 
-  // Peri-implant status (SP8 Task 5: implants only — supersedes the parodontal/
-  // inflammation mods there).
-  buildSelect($("#periImplantSelect"), getPeriImplantOptions(), (value)=>{
+  wireSelect("#periImplantSelect", getPeriImplantOptions, (value)=>{
     applyToSelected((s)=>{ applyPeriImplantSelection(s, value); });
   });
 
-  // Extraction wound
-  $("#extractionWound").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.extractionWound = (e.target as HTMLInputElement).checked;
-    });
+  wire("#extractionWound", "change", (e)=>{
+    applyToSelected((s)=>{ s.extractionWound = e.target.checked; });
   });
 
-  // Extraction plan
-  $("#extractionPlan").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.extractionPlan = (e.target as HTMLInputElement).checked;
-    });
+  wire("#extractionPlan", "change", (e)=>{
+    applyToSelected((s)=>{ s.extractionPlan = e.target.checked; });
   });
 
-  // Crown replace
-  $("#crownReplace").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.crownReplace = (e.target as HTMLInputElement).checked;
-    });
+  wire("#crownReplace", "change", (e)=>{
+    applyToSelected((s)=>{ s.crownReplace = e.target.checked; });
   });
 
-  // Crown needed
-  $("#crownNeeded").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.crownNeeded = (e.target as HTMLInputElement).checked;
-    });
+  wire("#crownNeeded", "change", (e)=>{
+    applyToSelected((s)=>{ s.crownNeeded = e.target.checked; });
   });
 
-  // Crown leakage (marginal leakage on a crown/bridge restoration)
-  $("#crownLeakage").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.crownLeakage = (e.target as HTMLInputElement).checked;
-    });
+  wire("#crownLeakage", "change", (e)=>{
+    applyToSelected((s)=>{ s.crownLeakage = e.target.checked; });
   });
 
-  // Missing closed
-  $("#missingClosed").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.missingClosed = (e.target as HTMLInputElement).checked;
-    });
+  wire("#missingClosed", "change", (e)=>{
+    applyToSelected((s)=>{ s.missingClosed = e.target.checked; });
   });
 
-  // Mobility
-  buildSelect($("#mobilitySelect"), getMobilityOptions(), (value)=>{
-    applyToSelected((s)=>{
-      s.mobility = value;
-    });
+  wireSelect("#mobilitySelect", getMobilityOptions, (value)=>{
+    applyToSelected((s)=>{ s.mobility = value; });
   });
 
-  // Inflammations
-  buildChecks($("#modsChecks"), MOD_OPTIONS, (id, on)=>{
-    applyToSelected((s)=>{
-      if(on) s.mods.add(id); else s.mods.delete(id);
-    });
-  });
-  buildSelect($("#periapicalTypeSelect"), getPeriapicalTypeOptions(), (val)=>{
+  {
+    const node = document.querySelector("#modsChecks");
+    if (node) {
+      buildChecks(node, MOD_OPTIONS, (id, on)=>{
+        applyToSelected((s)=>{
+          if(on) s.mods.add(id); else s.mods.delete(id);
+        });
+      });
+    }
+  }
+  wireSelect("#periapicalTypeSelect", getPeriapicalTypeOptions, (val)=>{
     applyToSelected((s)=>{ s.periapicalType = val; });
   });
 
-  // Caries surfaces in a cross layout; subcrown stays as a separate row.
-  // Toggling a surface on records its severity (from the active-depth dropdown);
-  // toggling off clears it. Subcrown carries no per-surface severity. SP6 Task 1:
-  // the single unified `cariesSeverity` map (was `cariesDepths`).
-  const cariesOnToggle = (id: Any, on: Any)=>{
+  const cariesOnToggle = (id: string, on: boolean)=>{
     applyToSelected((s)=>{
       if(on){
         s.caries.add(id);
@@ -5424,48 +5642,49 @@ function wireControls(){
       }
     });
   };
-  buildSurfaceCross($("#cariesChecks"), [
-    { value: "caries-buccal", labelKey: "surface.buccal", letter: "B", pos: "buccal" },
-    { value: "caries-mesial", labelKey: "surface.mesial", letter: "M", pos: "mesial" },
-    { value: "caries-occlusal", labelKey: "surface.occlusal", letter: "O", pos: "occlusal" },
-    { value: "caries-distal", labelKey: "surface.distal", letter: "D", pos: "distal" },
-    { value: "caries-lingual", labelKey: "surface.lingualPalatal", letter: "L", pos: "lingual" },
-  ], cariesOnToggle);
-  // Add a per-surface depth indicator (3 stacked bars) inside each caries cell.
-  // Clicking it opens a popup to change that surface's depth (only when caried).
-  $$("#cariesChecks .surface-cell").forEach((cell) => {
-    const input = cell.querySelector("input") as HTMLInputElement | null;
-    if(!input) return;
-    const surface = String(input.value).replace("caries-", "");
-    const ind = el("span", { class: "surf-depth", title: t("caries.detailsHint") }, [ el("i"), el("i"), el("i") ]);
-    ind.addEventListener("click", (e: Any)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      if(!input.checked || readOnly) return;
-      showCariesDepthPopup(surface, ind, activeTooth);
-    });
-    cell.appendChild(ind);
-  });
-  buildChecks($("#cariesSubcrownRow"), [
-    { value: "caries-subcrown", labelKey: "surface.subcrown" },
-  ], cariesOnToggle);
-  buildSelect($("#cariesDepthSelect"), getCariesDepthOptions(), (val)=>{
+  {
+    const node = document.querySelector("#cariesChecks");
+    if (node) {
+      buildSurfaceCross(node, [
+        { value: "caries-buccal", labelKey: "surface.buccal", letter: "B", pos: "buccal" },
+        { value: "caries-mesial", labelKey: "surface.mesial", letter: "M", pos: "mesial" },
+        { value: "caries-occlusal", labelKey: "surface.occlusal", letter: "O", pos: "occlusal" },
+        { value: "caries-distal", labelKey: "surface.distal", letter: "D", pos: "distal" },
+        { value: "caries-lingual", labelKey: "surface.lingualPalatal", letter: "L", pos: "lingual" },
+      ], cariesOnToggle);
+      $$("#cariesChecks .surface-cell").forEach((cell) => {
+        const input = cell.querySelector("input") as HTMLInputElement | null;
+        if(!input) return;
+        const surface = String(input.value).replace("caries-", "");
+        const ind = el("span", { class: "surf-depth", title: t("caries.detailsHint") }, [ el("i"), el("i"), el("i") ]);
+        ind.addEventListener("click", (e: any)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          if(!input.checked || readOnly) return;
+          showCariesDepthPopup(surface, ind, activeTooth);
+        });
+        cell.appendChild(ind);
+      });
+    }
+  }
+  {
+    const node = document.querySelector("#cariesSubcrownRow");
+    if (node) {
+      buildChecks(node, [
+        { value: "caries-subcrown", labelKey: "surface.subcrown" },
+      ], cariesOnToggle);
+    }
+  }
+  wireSelect("#cariesDepthSelect", getCariesDepthOptions, (val)=>{
     applyToSelected((s)=>{ s.cariesActiveDepth = Number(val); });
   });
-  // SP5 Task 5: per-tooth root-caries picker. On change the selected value is
-  // the canonical rootCaries enum (simple mode's "present" already maps to
-  // "active-cavitated" — SP6 Task 3), so it writes straight to state.
-  buildSelect($("#rootCariesSelect"), rootCariesOptions(), (value)=>{
+  wireSelect("#rootCariesSelect", rootCariesOptions, (value)=>{
     applyToSelected((s)=>{ s.rootCaries = value; });
   });
 
-  // Filling material dropdown
-  buildSelect($("#fillingSelect"), getFillingOptions(false), (mat)=>{
+  wireSelect("#fillingSelect", () => getFillingOptions(false), (mat)=>{
     applyToSelected((s)=>{
       s.fillingMaterial = mat;
-      // Clearing the active material removes any existing per-surface fillings,
-      // otherwise they would become orphaned (surface UI hides but state lingers,
-      // still rendering/serializing/exporting). Keeps the map and set in sync.
       if(mat === "none"){
         s.fillingSurfaces.clear();
         s.fillingSurfaceMaterials.clear();
@@ -5473,160 +5692,121 @@ function wireControls(){
     });
   });
 
-  // Filling surfaces in a cross layout.
-  buildSurfaceCross($("#fillingSurfaceChecks"), [
-    { value: "buccal", labelKey: "surface.buccal", letter: "B", pos: "buccal" },
-    { value: "mesial", labelKey: "surface.mesial", letter: "M", pos: "mesial" },
-    { value: "occlusal", labelKey: "surface.occlusal", letter: "O", pos: "occlusal" },
-    { value: "distal", labelKey: "surface.distal", letter: "D", pos: "distal" },
-    { value: "lingual", labelKey: "surface.lingualPalatal", letter: "L", pos: "lingual" },
-  ], (surf: Any, on: Any)=>{
-    applyToSelected((s)=>{
-      if(on && s.fillingMaterial !== "none"){
-        s.fillingSurfaces.add(surf);
-        s.fillingSurfaceMaterials.set(surf, s.fillingMaterial);
-      }else{
-        s.fillingSurfaces.delete(surf);
-        s.fillingSurfaceMaterials.delete(surf);
-      }
-    });
-  });
-  // SP6 Task 2 (step 2): mirror the caries-cell per-surface indicator onto each
-  // FILLING-surface cell. It signposts (and, via the contextual popup, authors)
-  // recurrent caries on a filled surface — CSS shows it only when the filling
-  // checkbox is checked, and the dark border (`.has-subcaries`) is toggled in
-  // syncFillingSubcariesIndicator when the surface actually has caries.
-  $$("#fillingSurfaceChecks .surface-cell").forEach((cell) => {
-    const input = cell.querySelector("input") as HTMLInputElement | null;
-    if(!input) return;
-    const surface = String(input.value);
-    const ind = el("span", { class: "surf-depth", title: t("caries.recurrentHint") }, [ el("i"), el("i"), el("i") ]);
-    ind.addEventListener("click", (e: Any)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      if(!input.checked || readOnly) return;
-      showCariesDepthPopup(surface, ind, activeTooth);
-    });
-    cell.appendChild(ind);
-  });
-  // SP10: LEFT-side per-surface filling-defect indicator (the RIGHT-side .surf-depth
-  // authors recurrent caries; this authors the structural defect). Shown by CSS only
-  // when the filling checkbox is checked; the dark border (.has-defect) is toggled in
-  // syncFillingDefectIndicator when the surface actually carries a defect.
-  $$("#fillingSurfaceChecks .surface-cell").forEach((cell) => {
-    const input = cell.querySelector("input") as HTMLInputElement | null;
-    if(!input) return;
-    const surface = String(input.value);
-    const ind = el("span", { class: "surf-defect", title: t("fillingDefect.label") }, [ el("i") ]);
-    ind.addEventListener("click", (e: Any)=>{
-      e.preventDefault(); e.stopPropagation();
-      if(!input.checked || readOnly) return;
-      showFillingDefectPopup(surface, ind, activeTooth);
-    });
-    cell.insertBefore(ind, cell.firstChild); // LEFT side
+  {
+    const node = document.querySelector("#fillingSurfaceChecks");
+    if (node) {
+      buildSurfaceCross(node, [
+        { value: "buccal", labelKey: "surface.buccal", letter: "B", pos: "buccal" },
+        { value: "mesial", labelKey: "surface.mesial", letter: "M", pos: "mesial" },
+        { value: "occlusal", labelKey: "surface.occlusal", letter: "O", pos: "occlusal" },
+        { value: "distal", labelKey: "surface.distal", letter: "D", pos: "distal" },
+        { value: "lingual", labelKey: "surface.lingualPalatal", letter: "L", pos: "lingual" },
+      ], (surf: string, on: boolean)=>{
+        applyToSelected((s)=>{
+          if(on && s.fillingMaterial !== "none"){
+            s.fillingSurfaces.add(surf);
+            s.fillingSurfaceMaterials.set(surf, s.fillingMaterial);
+          }else{
+            s.fillingSurfaces.delete(surf);
+            s.fillingSurfaceMaterials.delete(surf);
+          }
+        });
+      });
+      $$("#fillingSurfaceChecks .surface-cell").forEach((cell) => {
+        const input = cell.querySelector("input") as HTMLInputElement | null;
+        if(!input) return;
+        const surface = String(input.value);
+        const ind = el("span", { class: "surf-depth", title: t("caries.recurrentHint") }, [ el("i"), el("i"), el("i") ]);
+        ind.addEventListener("click", (e: any)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          if(!input.checked || readOnly) return;
+          showCariesDepthPopup(surface, ind, activeTooth);
+        });
+        cell.appendChild(ind);
+      });
+      $$("#fillingSurfaceChecks .surface-cell").forEach((cell) => {
+        const input = cell.querySelector("input") as HTMLInputElement | null;
+        if(!input) return;
+        const surface = String(input.value);
+        const ind = el("span", { class: "surf-defect", title: t("fillingDefect.label") }, [ el("i") ]);
+        ind.addEventListener("click", (e: any)=>{
+          e.preventDefault(); e.stopPropagation();
+          if(!input.checked || readOnly) return;
+          showFillingDefectPopup(surface, ind, activeTooth);
+        });
+        cell.insertBefore(ind, cell.firstChild);
+      });
+    }
+  }
+
+  wire("#fissureSealing", "change", (e)=>{
+    applyToSelected((s)=>{ s.fissureSealing = e.target.checked; });
   });
 
-  // Fissure sealing
-  $("#fissureSealing").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.fissureSealing = (e.target as HTMLInputElement).checked;
-    });
+  wire("#calculusToggle", "change", (e)=>{
+    applyToSelected((s)=>{ s.calculus = e.target.checked; });
   });
 
-  // Calculus
-  $("#calculusToggle").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{ s.calculus = (e.target as HTMLInputElement).checked; });
+  wire("#contactMesial", "change", (e)=>{
+    applyToSelected((s)=>{ s.contactMesial = e.target.checked; });
+  });
+  wire("#contactDistal", "change", (e)=>{
+    applyToSelected((s)=>{ s.contactDistal = e.target.checked; });
   });
 
-  // Contact point missing
-  $("#contactMesial").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.contactMesial = (e.target as HTMLInputElement).checked;
-    });
-  });
-  $("#contactDistal").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.contactDistal = (e.target as HTMLInputElement).checked;
-    });
-  });
-
-  // Wear (SP11 Task 3: wearEdge/wearCervical enum pickers — replaces the
-  // bruxism checkboxes; mirrors the #resorptionSelect buildSelect wiring).
-  buildSelect($("#wearEdgeSelect"), getWearEdgeOptions(), (value)=>{
+  wireSelect("#wearEdgeSelect", getWearEdgeOptions, (value)=>{
     applyToSelected((s)=>{ s.wearEdge = value; });
   });
-  buildSelect($("#wearCervicalSelect"), getWearCervicalOptions(), (value)=>{
+  wireSelect("#wearCervicalSelect", getWearCervicalOptions, (value)=>{
     applyToSelected((s)=>{ s.wearCervical = value; });
   });
-
-  // Wear simple-mode toggles (SP13 Task 2: yes/no checkboxes shown instead of
-  // the selects above when wearDetailLevel === "simple"; write the canonical
-  // simple value on check, "none" on uncheck).
-  $("#wearEdgeToggle").addEventListener("change", (e)=>{
-    const on = (e.target as HTMLInputElement).checked;
+  wire("#wearEdgeToggle", "change", (e)=>{
+    const on = e.target.checked;
     applyToSelected((s)=>{ s.wearEdge = on ? "attrition" : "none"; });
   });
-  $("#wearCervicalToggle").addEventListener("change", (e)=>{
-    const on = (e.target as HTMLInputElement).checked;
+  wire("#wearCervicalToggle", "change", (e)=>{
+    const on = e.target.checked;
     applyToSelected((s)=>{ s.wearCervical = on ? "abrasion" : "none"; });
   });
 
-  // Discoloration (SP12 Task 3: discoloration enum picker — mirrors the
-  // wearEdge/wearCervical buildSelect wiring above).
-  buildSelect($("#discolorationSelect"), getDiscolorationOptions(), (value)=>{
+  wireSelect("#discolorationSelect", getDiscolorationOptions, (value)=>{
     applyToSelected((s)=>{ s.discoloration = value; });
   });
-
-  // Discoloration simple-mode toggle (SP13 Task 2: mirrors the wear toggles
-  // above; independent discolorationDetailLevel setting).
-  $("#discolorationToggle").addEventListener("change", (e)=>{
-    const on = (e.target as HTMLInputElement).checked;
+  wire("#discolorationToggle", "change", (e)=>{
+    const on = e.target.checked;
     applyToSelected((s)=>{ s.discoloration = on ? "other" : "none"; });
   });
 
-  // Ortho (SP14 Task 3: appliance/drift/vertical enum pickers + rotation
-  // boolean toggle — mirrors the discoloration buildSelect/toggle wiring
-  // above).
-  buildSelect($("#orthoApplianceSelect"), getOrthoApplianceOptions(), (value)=>{
+  wireSelect("#orthoApplianceSelect", getOrthoApplianceOptions, (value)=>{
     applyToSelected((s)=>{ s.orthoAppliance = value; });
   });
-  buildSelect($("#orthoDriftSelect"), getOrthoDriftOptions(), (value)=>{
+  wireSelect("#orthoDriftSelect", getOrthoDriftOptions, (value)=>{
     applyToSelected((s)=>{ s.orthoDrift = value; });
   });
-  buildSelect($("#orthoVerticalSelect"), getOrthoVerticalOptions(), (value)=>{
+  wireSelect("#orthoVerticalSelect", getOrthoVerticalOptions, (value)=>{
     applyToSelected((s)=>{ s.orthoVertical = value; });
   });
-  $("#orthoRotationToggle").addEventListener("change", (e)=>{
-    const on = (e.target as HTMLInputElement).checked;
+  wire("#orthoRotationToggle", "change", (e)=>{
+    const on = e.target.checked;
     applyToSelected((s)=>{ s.orthoRotation = on; });
   });
 
-  // Bridge pillar
-  $("#bridgePillar").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.bridgePillar = (e.target as HTMLInputElement).checked;
-    });
+  wire("#bridgePillar", "change", (e)=>{
+    applyToSelected((s)=>{ s.bridgePillar = e.target.checked; });
   });
 
-  // Broken crown parts
-  $("#brokenMesial").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.brokenMesial = (e.target as HTMLInputElement).checked;
-    });
+  wire("#brokenMesial", "change", (e)=>{
+    applyToSelected((s)=>{ s.brokenMesial = e.target.checked; });
   });
-  $("#brokenIncisal").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.brokenIncisal = (e.target as HTMLInputElement).checked;
-    });
+  wire("#brokenIncisal", "change", (e)=>{
+    applyToSelected((s)=>{ s.brokenIncisal = e.target.checked; });
   });
-  $("#brokenDistal").addEventListener("change", (e)=>{
-    applyToSelected((s)=>{
-      s.brokenDistal = (e.target as HTMLInputElement).checked;
-    });
+  wire("#brokenDistal", "change", (e)=>{
+    applyToSelected((s)=>{ s.brokenDistal = e.target.checked; });
   });
 
-  // Reset buttons
-  $("#btnResetTooth").addEventListener("click", ()=>{
+  wire("#btnResetTooth", "click", ()=>{
     if(selectedTeeth.size === 0) return;
     setEdentulous(false);
     for(const toothNo of selectedTeeth){
@@ -5640,7 +5820,7 @@ function wireControls(){
     }
   });
 
-  $("#btnResetAll").addEventListener("click", ()=>{
+  wire("#btnResetAll", "click", ()=>{
     setEdentulous(false);
     for(const toothNo of ALL_TEETH){
       toothState.set(toothNo, defaultState());
@@ -5653,16 +5833,13 @@ function wireControls(){
     }
   });
 
-  $("#btnPrimaryDentition").addEventListener("click", ()=>{
+  wire("#btnPrimaryDentition", "click", ()=>{
     setEdentulous(false);
     suppressEdentulousSync = true;
     for(const toothNo of ALL_TEETH){
       const s = defaultState();
-      if(PRIMARY_MILK.has(toothNo)){
-        s.toothSelection = "milktooth";
-      }else{
-        s.toothSelection = "none";
-      }
+      if(PRIMARY_MILK.has(toothNo)){ s.toothSelection = "milktooth"; }
+      else { s.toothSelection = "none"; }
       toothState.set(toothNo, s);
       applyStateToSvg(toothNo);
       updateToothTileNumber(toothNo);
@@ -5671,18 +5848,14 @@ function wireControls(){
     if(activeTooth) syncControlsFromState(toothState.get(activeTooth));
   });
 
-  $("#btnMixedDentition").addEventListener("click", ()=>{
+  wire("#btnMixedDentition", "click", ()=>{
     setEdentulous(false);
     suppressEdentulousSync = true;
     for(const toothNo of ALL_TEETH){
       const s = defaultState();
-      if(MIXED_PERMANENT.has(toothNo)){
-        s.toothSelection = "tooth-base";
-      }else if(MIXED_MILK.has(toothNo)){
-        s.toothSelection = "milktooth";
-      }else if(MIXED_NONE.has(toothNo)){
-        s.toothSelection = "none";
-      }
+      if(MIXED_PERMANENT.has(toothNo)){ s.toothSelection = "tooth-base"; }
+      else if(MIXED_MILK.has(toothNo)){ s.toothSelection = "milktooth"; }
+      else if(MIXED_NONE.has(toothNo)){ s.toothSelection = "none"; }
       toothState.set(toothNo, s);
       applyStateToSvg(toothNo);
       updateToothTileNumber(toothNo);
@@ -5691,105 +5864,101 @@ function wireControls(){
     if(activeTooth) syncControlsFromState(toothState.get(activeTooth));
   });
 
-  // Status extras
-  const statusExtras = getStatusExtras();
-  if(statusExtras.length){
-    const statusOptions = statusExtras.map((opt)=>({ value: opt.id, label: opt.label }));
-    buildSelect($("#statusExtraSelect"), statusOptions, ()=>{});
-    setSelectOptions($("#statusExtraSelect"), statusOptions, statusOptions[0]?.value);
-    $("#statusExtraApply").addEventListener("click", ()=>{
-      const id = $("#statusExtraSelect").value;
-      const option = statusExtras.find(o => o.id === id);
-      applyStatusExtra(option);
-    });
+  {
+    const statusExtras = getStatusExtras();
+    const selectEl = document.querySelector("#statusExtraSelect") as HTMLSelectElement | null;
+    if(statusExtras.length && selectEl){
+      const statusOptions = statusExtras.map((opt)=>({ value: opt.id, label: opt.label }));
+      buildSelect(selectEl, statusOptions, ()=>{});
+      setSelectOptions(selectEl, statusOptions, statusOptions[0]?.value);
+      wire("#statusExtraApply", "click", ()=>{
+        const id = selectEl.value;
+        const option = statusExtras.find(o => o.id === id);
+        applyStatusExtra(option);
+      });
+    }
   }
 
-  $("#btnSelectAll").addEventListener("click", ()=>{
+  wire("#btnSelectAll", "click", ()=>{
     selectedTeeth = new Set(ALL_TEETH);
     activeTooth = ALL_TEETH[0];
     updateToothTileVisibility();
   });
-  $("#btnSelectAllPresent").addEventListener("click", ()=>{
+  wire("#btnSelectAllPresent", "click", ()=>{
     const present = ALL_TEETH.filter(tn => toothState.get(tn)?.toothSelection !== "none");
     selectedTeeth = new Set(present);
     activeTooth = present[0] ?? null;
     updateToothTileVisibility();
   });
-  $("#btnSelectPermanent").addEventListener("click", ()=>{
+  wire("#btnSelectPermanent", "click", ()=>{
     const permanent = ALL_TEETH.filter(tn => toothState.get(tn)?.toothSelection === "tooth-base");
     selectedTeeth = new Set(permanent);
     activeTooth = permanent[0] ?? null;
     updateToothTileVisibility();
   });
-  $("#btnSelectMilk").addEventListener("click", ()=>{
+  wire("#btnSelectMilk", "click", ()=>{
     const milk = ALL_TEETH.filter(tn => toothState.get(tn)?.toothSelection === "milktooth");
     selectedTeeth = new Set(milk);
     activeTooth = milk[0] ?? null;
     updateToothTileVisibility();
   });
-  $("#btnSelectImplants").addEventListener("click", ()=>{
+  wire("#btnSelectImplants", "click", ()=>{
     const implants = ALL_TEETH.filter(tn => toothState.get(tn)?.toothSelection === "implant");
     selectedTeeth = new Set(implants);
     activeTooth = implants[0] ?? null;
     updateToothTileVisibility();
   });
-  $("#btnSelectAllMissing").addEventListener("click", ()=>{
+  wire("#btnSelectAllMissing", "click", ()=>{
     const missing = ALL_TEETH.filter(tn => toothState.get(tn)?.toothSelection === "none");
     selectedTeeth = new Set(missing);
     activeTooth = missing[0] ?? null;
     updateToothTileVisibility();
   });
-  $("#btnSelectUpper").addEventListener("click", ()=>{
+  wire("#btnSelectUpper", "click", ()=>{
     selectedTeeth = new Set(ALL_TEETH.filter(tn => tn >= 11 && tn <= 28));
     activeTooth = 11;
     updateToothTileVisibility();
   });
-  $("#btnSelectUpperFront").addEventListener("click", ()=>{
+  wire("#btnSelectUpperFront", "click", ()=>{
     const front = [13,12,11,21,22,23];
     selectedTeeth = new Set(front);
     activeTooth = front[0];
     updateToothTileVisibility();
   });
-  $("#btnSelectUpperMolar").addEventListener("click", ()=>{
+  wire("#btnSelectUpperMolar", "click", ()=>{
     const molars = [18,17,16,26,27,28];
     selectedTeeth = new Set(molars);
     activeTooth = molars[0];
     updateToothTileVisibility();
   });
-  $("#btnSelectLower").addEventListener("click", ()=>{
+  wire("#btnSelectLower", "click", ()=>{
     selectedTeeth = new Set(ALL_TEETH.filter(tn => tn >= 31 && tn <= 48));
     activeTooth = 31;
     updateToothTileVisibility();
   });
-  $("#btnSelectLowerFront").addEventListener("click", ()=>{
+  wire("#btnSelectLowerFront", "click", ()=>{
     const front = [43,42,41,31,32,33];
     selectedTeeth = new Set(front);
     activeTooth = front[0];
     updateToothTileVisibility();
   });
-  $("#btnSelectLowerMolar").addEventListener("click", ()=>{
+  wire("#btnSelectLowerMolar", "click", ()=>{
     const molars = [38,37,36,46,47,48];
     selectedTeeth = new Set(molars);
     activeTooth = molars[0];
     updateToothTileVisibility();
   });
-  $("#btnSelectNone").addEventListener("click", ()=>{
+  wire("#btnSelectNone", "click", ()=>{
     selectedTeeth = new Set();
     activeTooth = null;
     updateSelectionUI();
   });
-  $("#btnSelectNoneChart").addEventListener("click", ()=>{
+  wire("#btnSelectNoneChart", "click", ()=>{
     selectedTeeth = new Set();
     activeTooth = null;
     updateSelectionUI();
   });
 
-  // The global visibility toggles (edentulous / wisdom / occlusal / bone / pulp)
-  // are handled by the delegated onGlobalToggleClick listener registered above.
-
-  // Card collapse toggles use a single delegated listener on `document` (see
-  // onCardToggleClick). Here we only set the initial a11y labels to match each
-  // card's current collapsed state; the click handling is delegation-based.
   const statusCard = $("#statusCard");
   const statusToggle = $("#btnToggleStatusCard");
   if(statusCard && statusToggle){
@@ -5815,24 +5984,14 @@ function wireControls(){
   const fhirBtn = $("#btnStatusFhirExport") as HTMLButtonElement | null;
   const importBtn = $("#btnStatusImport") as HTMLButtonElement | null;
   const importInput = $("#statusImportInput") as HTMLInputElement | null;
-  if(exportBtn){
-    exportBtn.onclick = () => exportStatus();
-  }
-  if(fhirBtn){
-    fhirBtn.onclick = () => exportFhir();
-  }
+  if(exportBtn) exportBtn.onclick = () => exportStatus();
+  if(fhirBtn) fhirBtn.onclick = () => exportFhir();
   const pngBtn = $("#btnStatusPngExport") as HTMLButtonElement | null;
   const jpgBtn = $("#btnStatusJpgExport") as HTMLButtonElement | null;
   const svgBtn = $("#btnStatusSvgExport") as HTMLButtonElement | null;
-  if(pngBtn){
-    pngBtn.onclick = () => { exportImage("png").catch((e)=>console.error("PNG export failed", e)); };
-  }
-  if(jpgBtn){
-    jpgBtn.onclick = () => { exportImage("jpg").catch((e)=>console.error("JPG export failed", e)); };
-  }
-  if(svgBtn){
-    svgBtn.onclick = () => { exportSvg().catch((e)=>console.error("SVG export failed", e)); };
-  }
+  if(pngBtn) pngBtn.onclick = () => { exportImage("png").catch((e)=>console.error("PNG export failed", e)); };
+  if(jpgBtn) jpgBtn.onclick = () => { exportImage("jpg").catch((e)=>console.error("JPG export failed", e)); };
+  if(svgBtn) svgBtn.onclick = () => { exportSvg().catch((e)=>console.error("SVG export failed", e)); };
   if(importBtn && importInput){
     importBtn.onclick = () => {
       importInput.value = "";
@@ -5859,7 +6018,6 @@ function wireControls(){
     };
   }
 }
-
 /**
  * Switch the displayed tooth numbering system and re-render all tooth labels.
  * @param system - The target {@link NumberingSystem}.
@@ -5955,15 +6113,40 @@ export function destroyOdontogram(){
   activeTooth = null;
 }
 
+
 /**
  * Clear the current tooth selection and reset the active tooth. Useful when
  * switching to view or quote-builder mode from the host application.
  */
-export function clearSelection(){
-  selectedTeeth = new Set();
-  activeTooth = null;
+/**
+ * انتخاب یا لغو انتخاب یک دندون (toggle).
+ * @param toothNo - شماره دندون (FDI)
+ */
+export function toggleToothSelection(toothNo: number): void {
+  const tile = toothTile.get(toothNo);
+  if (!tile || tile.length === 0) return;
+  
+  if (selectedTeeth.has(toothNo)) {
+    selectedTeeth.delete(toothNo);
+    if (activeTooth === toothNo) {
+      activeTooth = selectedTeeth.values().next().value ?? null;
+    }
+  } else {
+    selectedTeeth.add(toothNo);
+    activeTooth = toothNo;
+  }
+  
   updateSelectionUI();
+  notifySelectionChange();
 }
+
+/**
+
+
+/**
+ * گوش دادن به تغییرات انتخاب.
+ */
+
 /**
  * Register one or more custom SVG plugins. Plugins can inject visual overlays
  * into the tooth SVG and maintain per-tooth custom state included in export/import.
@@ -6346,3 +6529,4 @@ export function getNotesEnabled(): boolean{
 }
 
 export { setOcclusalVisible, setWisdomVisible, setShowBase, setHealthyPulpVisible };
+

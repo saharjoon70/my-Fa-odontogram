@@ -284,6 +284,23 @@ export declare function computeFillingDefectSummaryLine(selectedToothNos: Iterab
  *  without requiring a live initOdontogram(). Mirrors
  *  __syncInflammationModVisibilityForTest. Not part of the public API. */
 export declare function __syncToothDetailControlsForTest(state: Record<string, unknown>): void;
+export declare function onSelectionChange(cb: (teeth: number[]) => void): () => void;
+export declare function getSelectedTeeth(): number[];
+/**
+ * ست کردن state یه دندون + رندر مجدد SVG.
+ * برای preview و apply درمان از این استفاده کن.
+ */
+/**
+ * ست کردن state یه دندون + رندر مجدد SVG.
+ * برای preview و apply درمان از این استفاده کن.
+ */
+export declare function setToothStateAndRender(toothNo: number, patch: Record<string, unknown>): void;
+/**
+ * خوندن state یه دندون.
+ */
+export declare function getToothState(toothNo: number): Record<string, unknown> | null;
+export declare function setSelectedTeeth(toothNos: number[]): void;
+export declare function clearSelection(): void;
 /** Popup to author a single caries surface on the selected teeth. Beyond the
  *  original visual caries-depth (ICDAS/3-level) picker it now offers, in the
  *  SAME anchored popup (SP5 Task 5): a per-surface secondary-caries CARS-score
@@ -399,12 +416,14 @@ export declare function exportSvg(): Promise<void>;
  * html2canvas DOM rasterization, and sharper.
  */
 export declare function exportImage(format?: "png" | "jpg"): Promise<void>;
+export declare function exportStatus(): void;
 /**
  * Export the current odontogram as an HL7 FHIR R4 collection Bundle (JSON).
  * @param options - Optional subject reference (e.g. "Patient/123"); when
  *   omitted a placeholder Patient is embedded.
  */
 export declare function exportFhir(options?: FhirExportOptions): void;
+export declare function importStatus(data: Any): void;
 /** Import a FHIR R4 Bundle (object or JSON string) produced by this module. */
 export declare function importFhirBundle(input: Any): void;
 /** TEST-ONLY: apply a clinical status-extra preset (span/arch-bridge/removable/
@@ -434,7 +453,17 @@ export declare function destroyOdontogram(): void;
  * Clear the current tooth selection and reset the active tooth. Useful when
  * switching to view or quote-builder mode from the host application.
  */
-export declare function clearSelection(): void;
+/**
+ * انتخاب یا لغو انتخاب یک دندون (toggle).
+ * @param toothNo - شماره دندون (FDI)
+ */
+export declare function toggleToothSelection(toothNo: number): void;
+/**
+
+
+/**
+ * گوش دادن به تغییرات انتخاب.
+ */
 /**
  * Register one or more custom SVG plugins. Plugins can inject visual overlays
  * into the tooth SVG and maintain per-tooth custom state included in export/import.
