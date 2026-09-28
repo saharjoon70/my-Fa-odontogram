@@ -10921,7 +10921,7 @@ const Ld = ne(() => ee.records), Ed = ne(() => ee.records.length), na = [
   // ۸. پریو — Periodontics
   // ═══════════════════════════════════════════════
   { id: "deep-scaling", label: "جرم‌گیری عمیق", category: "perio", icon: "sparkles", defaultPrice: 12e5 },
-  { id: "curettage", label: "کورتاژ لثه", category: "perio", icon: "scissors", defaultPrice: 15e5 },
+  { id: "curettage1", label: "کورتاژ لثه", category: "perio", icon: "scissors", defaultPrice: 15e5 },
   { id: "root-planing", label: "Root Planing", category: "perio", icon: "sparkles", defaultPrice: 18e5 },
   { id: "flap-surgery", label: "جراحی فلپ لثه", category: "perio", icon: "scissors", defaultPrice: 4e6 },
   { id: "gingival-graft", label: "پیوند لثه", category: "perio", icon: "bone", defaultPrice: 5e6 },

@@ -73,10 +73,12 @@ const canSubmit = computed(() => {
 function refreshPreview() {
   if (props.toothNos.length === 0) return;
 
+  // مرحله ۱: پاک کردن preview قبلی
   for (const toothNo of props.toothNos) {
     resetToothToStoredState(props.patientId, toothNo);
   }
 
+  // مرحله ۲: اعمال preview جدید
   if (!selected.value) return;
   for (const toothNo of props.toothNos) {
     previewTreatmentItem(toothNo, selected.value, {

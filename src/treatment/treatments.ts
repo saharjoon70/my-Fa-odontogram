@@ -129,7 +129,7 @@ export const TREATMENTS: TreatmentItem[] = [
   // ۸. پریو — Periodontics
   // ═══════════════════════════════════════════════
   { id: "deep-scaling",              label: "جرم‌گیری عمیق",              category: "perio", icon: "sparkles",   defaultPrice: 1200000 },
-  { id: "curettage",                 label: "کورتاژ لثه",                category: "perio", icon: "scissors",   defaultPrice: 1500000 },
+  { id: "curettage1",                 label: "کورتاژ لثه",                category: "perio", icon: "scissors",   defaultPrice: 1500000 },
   { id: "root-planing",              label: "Root Planing",              category: "perio", icon: "sparkles",   defaultPrice: 1800000 },
   { id: "flap-surgery",              label: "جراحی فلپ لثه",              category: "perio", icon: "scissors",   defaultPrice: 4000000 },
   { id: "gingival-graft1",            label: "پیوند لثه",                  category: "perio", icon: "bone",       defaultPrice: 5000000 },

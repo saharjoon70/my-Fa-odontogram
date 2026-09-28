@@ -1031,4 +1031,47 @@
 </g>
 
 
+
+<g id="curettage1" data-active="0" data-treatment="curettage1">
+  <!-- ناحیه لثه ملتهب (قبل از کورتاژ) -->
+  <ellipse cx="19.5" cy="25" rx="9" ry="6" 
+           fill="#ef5350" 
+           fill-opacity="0.5" 
+           stroke="#c62828" 
+           stroke-width="1.5"
+           stroke-dasharray="4,2"/>
+  
+  <!-- ناحیه کورتاژ شده (بعد از درمان - روشن‌تر) -->
+  <ellipse cx="19.5" cy="25" rx="6" ry="4" 
+           fill="#ffcdd2" 
+           fill-opacity="0.7" 
+           stroke="#e57373" 
+           stroke-width="1"/>
+  
+  <!-- خطوط کورتاژ (سطح تمیز شده) -->
+  <path d="M15,24 Q19.5,22.5 24,24" 
+        fill="none" 
+        stroke="#c62828" 
+        stroke-width="1.2" 
+        stroke-linecap="round"/>
+  <path d="M15,26 Q19.5,24.5 24,26" 
+        fill="none" 
+        stroke="#c62828" 
+        stroke-width="1.2" 
+        stroke-linecap="round"/>
+  <path d="M16,28 Q19.5,26.5 23,28" 
+        fill="none" 
+        stroke="#c62828" 
+        stroke-width="1.2" 
+        stroke-linecap="round"/>
+  
+  <!-- درخشش سطح تمیز -->
+  <path d="M16,23 Q19.5,21.5 23,23" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="1" 
+        stroke-linecap="round" 
+        opacity="0.6"/>
+</g>
+
   </svg>

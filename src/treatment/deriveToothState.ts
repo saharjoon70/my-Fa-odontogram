@@ -415,7 +415,7 @@ export function treatmentToPatchPreview(
 
   // ═══ پریو ═══
   else if (id === "deep-scaling" || id === "root-planing" ||
-           id === "curettage" || id === "flap-surgery" ||
+           id === "curettage1" || id === "flap-surgery" ||
            id === "periodontitis-treatment" || id === "laser-gum-therapy") {
     patch.calculus = true;
     patch.mods = { toggle: "parodontal", on: true };
@@ -474,7 +474,8 @@ const CUSTOM_SVG_TREATMENTS = [
   "tmj-treatment",
   "gingival-graft1",
   "prosthesis-repair",
-  "smile-design"
+  "smile-design",
+  "curettage1"
   // هر سرویس دیگری که SVG سفارشی دارد
 ];
 
