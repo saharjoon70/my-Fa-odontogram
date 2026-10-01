@@ -69,6 +69,11 @@ export function defaultToothState(): Record<string, unknown> {
   };
 }
 
+const SHARED_SVG: Record<string, string> = {
+  "scaling-polishing1":      "scaling-polishing1",
+  "deep-scaling": "scaling-polishing1",
+  "simple-brushing":   "scaling-polishing1",
+};
 // ═══════════════════════════════════════════════
 // applyPatch
 // ═══════════════════════════════════════════════
@@ -414,15 +419,13 @@ export function treatmentToPatchPreview(
   }
 
   // ═══ پریو ═══
-  else if (id === "deep-scaling"  || id === "flap-surgery" ||
-           id === "periodontitis-treatment" || id === "laser-gum-therapy") {
-    patch.calculus = true;
-    patch.mods = { toggle: "parodontal", on: true };
-  } else if (id === "gingival-graft" || id === "keratinized-gum-graft" ||
-             id === "gingivectomy" || id === "gum-contouring" ||
-             id === "gum-aesthetics") {
-    patch.mods = { toggle: "parodontal", on: true };
-  }
+  // else if (id === "laser-gum-therapy") {
+  //   patch.calculus = true;
+  //   patch.mods = { toggle: "parodontal", on: true };
+  // } else if (id === "gingival-graft"   || id === "gum-contouring" ||
+  //            id === "gum-aesthetics") {
+  //   patch.mods = { toggle: "parodontal", on: true };
+  // }
 
   // ═══ زیبایی ═══
   else if (id === "bleaching-office" || id === "bleaching-home" ||
@@ -458,8 +461,7 @@ export function treatmentToPatchPreview(
   }
 
   // ═══ خدمات جانبی / پیشگیری ═══
-  else if (id === "plaque-control" || id === "scaling-polishing" ||
-           id === "simple-brushing") {
+  else if (id === "simple-brushing") {
     patch.calculus = true;
   } else if (id === "fissure-sealing") {
     patch.fissureSealing = true;
@@ -477,7 +479,17 @@ const CUSTOM_SVG_TREATMENTS = [
   "curettage1",
   "dsd",
   "root-planing",
-  "flap-surgery"
+  "flap-surgery",
+  "keratinized-gum-graft",
+  "frenectomy-perio",
+  "gingivectomy",
+  "microabrasion",
+  "fluoride-therapy",
+  "biopsy",
+  "periodontitis-treatment",
+  "laser-gum-therapy",
+  "gum-contouring",
+  "cosmetic-polishing"
   // هر سرویس دیگری که SVG سفارشی دارد
 ];
 
@@ -485,6 +497,14 @@ if (CUSTOM_SVG_TREATMENTS.includes(id)) {
   patch.customStates = {
     ...(patch.customStates as Record<string, unknown> ?? {}),
     activeTreatments: [id],
+  };
+}
+// ⭐ سرویس‌هایی که SVG مشترک دارند
+const sharedId = SHARED_SVG[id];
+if (sharedId) {
+  patch.customStates = {
+    ...(patch.customStates as Record<string, unknown> ?? {}),
+    activeTreatments: [sharedId],
   };
 }
   return Object.keys(patch).length > 0 ? patch : null;

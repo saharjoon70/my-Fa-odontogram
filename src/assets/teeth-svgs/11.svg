@@ -1200,4 +1200,468 @@
   <circle cx="19.5" cy="23" r="0.7" fill="#b71c1c"/>
   <circle cx="24" cy="24" r="0.7" fill="#b71c1c"/>
 </g>
+<g id="keratinized-gum-graft" data-active="0" data-treatment="keratinized-gum-graft">
+
+  <path d="M9,40 
+           C9,33 14,27 21,27 
+           C28,27 33,33 33,40 
+           L31.5,40 
+           C31.5,34.5 27,29.5 21,29.5 
+           C15,29.5 10.5,34.5 10.5,40 
+           Z" 
+        fill="#d81313" 
+        stroke="none"/>
+</g>
+<g id="frenectomy-perio" data-active="0" data-treatment="frenectomy-perio">
+  <!-- رنگ‌آمیزی استخوان (bone-base) -->
+  <path d="M39.6,17.5l-2.8,1.3c-2.6,1.5,0,9.3-2,11.7,0,4.8-4.6,3.8-5.9,3.7-3.9-.2-13.2,0-17.6,0s-5-3.1-5.1-3c-2.1,0-2.2-12.3-2.2-12.3l-1.5-2.2c-.2-.4-2.3-1-2.3-1.5V0h39.6v17.5h-.1Z" 
+        fill="#ffb200" 
+        fill-opacity="0.5" 
+        stroke="#e65100" 
+        stroke-width="1"/>
+  
+  <!-- رنگ‌آمیزی لثه (gum-base) -->
+  <path d="M39.1,19.1c-1.1,1-2.7,1.7-3.2,3.1-1.1,3.6-.2,7.7-1.6,11.2-2.1,5.2-6,.4-9.9.5-3.9,0-8.2-.2-11.9.5-2.3.6-4.6,2.6-7,1.2-5.7-3.8-1.8-12.8-4-17.9-.2-.9-2.1-2.3-1.1-2.9,1.1-.5,4.1,1,4.5,2.2,2.1,3.8-1.9,14.1,3.5,15.5,2.6.3,8.3-.6,13.2-.9,3.7-.6,9.4.9,11.4-2.3,2.1-3.3-.1-8.2,2.5-11.3,2.6-3.1,5.5-1.2,3.8.9h0v.2h-.1Z" 
+        fill="#d81313" 
+        fill-opacity="0.6" 
+        stroke="#b71c1c" 
+        stroke-width="1"/>
+</g>
+
+<g id="gingivectomy" data-active="0" data-treatment="gingivectomy">
+  
+  <!-- ===== لثه قدیم (قبل از درمان) - قهوه‌ای ===== -->
+  <path d="M8,32 Q19.5,28 31,32" 
+        fill="none" 
+        stroke="#A52A2A" 
+        stroke-width="1.8" 
+        stroke-dasharray="5,3" 
+        opacity="0.9"/>
+  
+  <!-- ===== لثه جدید (بعد از جینجیوکتومی) - قرمز ===== -->
+  <path d="M9,21 Q19.5,17 30,21" 
+        fill="none" 
+        stroke="#e53935" 
+        stroke-width="1.8" 
+        stroke-linecap="round" 
+        stroke-dasharray="3,2"/>
+  
+  <!-- ===== فلش‌ها - قرمز جیغ (رو به بالا) ===== -->
+  <g stroke="#ff0000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    
+    <!-- فلش چپ -->
+    <line x1="11" y1="30" x2="11" y2="23"/>
+    <polyline points="8.5,25.5 11,22.5 13.5,25.5"/>
+    
+    <!-- فلش وسط -->
+    <line x1="19.5" y1="27" x2="19.5" y2="19.5"/>
+    <polyline points="16.5,22 19.5,18.5 22.5,22"/>
+    
+    <!-- فلش راست -->
+    <line x1="28" y1="30" x2="28" y2="23"/>
+    <polyline points="25.5,25.5 28,22.5 30.5,25.5"/>
+    
+  </g>
+  
+  <!-- ===== نماد مثلث - قرمز جیغ ===== -->
+  <g font-family="Arial, sans-serif" font-size="2.8" font-weight="bold" fill="#ff0000" text-anchor="middle">
+    <text x="11" y="16">▲</text>
+    <text x="19.5" y="13">▲</text>
+    <text x="28" y="16">▲</text>
+  </g>
+  
+  <!-- ===== برچسب نام درمان - قرمز ===== -->
+  <text x="19.5" y="10" 
+        font-family="Arial, sans-serif" 
+        font-size="3" 
+        font-weight="bold" 
+        fill="#e53935" 
+        text-anchor="middle" 
+        opacity="0.95">
+    Gingivectomy
+  </text>
+  
+  <!-- ===== درخشش (اختیاری) ===== -->
+  <path d="M12,19 Q19.5,16 27,19" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="1" 
+        stroke-linecap="round" 
+        opacity="0.5"/>
+  
+  <!-- ===== ذرات ریز (اختیاری) ===== -->
+  <circle cx="13" cy="24" r="0.6" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="26" cy="24" r="0.6" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="19.5" cy="21" r="0.5" fill="#ff8a80" opacity="0.6"/>
+  
+</g>
+<g id="microabrasion" data-active="0" data-treatment="microabrasion">
+  <!-- ناحیه لکه‌های سطحی (۱.۵ پیکسل راست از اصل) -->
+  <ellipse cx="16.5" cy="40" rx="4" ry="2.8" 
+           fill="#fff9c4" 
+           fill-opacity="0.7" 
+           stroke="#f9a825" 
+           stroke-width="0.9"/>
+  
+  <ellipse cx="25.5" cy="48" rx="3.5" ry="2.5" 
+           fill="#fff9c4" 
+           fill-opacity="0.7" 
+           stroke="#f9a825" 
+           stroke-width="0.9"/>
+  
+  <ellipse cx="17.5" cy="56" rx="3" ry="2.2" 
+           fill="#fff9c4" 
+           fill-opacity="0.7" 
+           stroke="#f9a825" 
+           stroke-width="0.9"/>
+  
+  <!-- خمیر سایش سرمه‌ای (۱.۵ پیکسل راست از اصل) -->
+  <path d="M11.5,34 
+           Q10.5,46 11.5,58 
+           Q12.5,63 21,64 
+           Q29.5,63 30.5,58 
+           Q31.5,46 30.5,34 
+           Q29.5,32 21,32 
+           Q12.5,32 11.5,34 Z" 
+        fill="#1a237e" 
+        fill-opacity="0.6" 
+        stroke="#0d47a1" 
+        stroke-width="1.2"/>
+  
+  <!-- بافت خمیر (ذرات سرمه‌ای) -->
+  <circle cx="13.5" cy="38" r="1.2" fill="#283593" opacity="0.8"/>
+  <circle cx="17.5" cy="36" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="22.5" cy="37" r="1.1" fill="#283593" opacity="0.8"/>
+  <circle cx="27.5" cy="39" r="1" fill="#283593" opacity="0.8"/>
+  
+  <circle cx="12.5" cy="44" r="1.1" fill="#283593" opacity="0.8"/>
+  <circle cx="16.5" cy="43" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="21" cy="42" r="1.2" fill="#283593" opacity="0.8"/>
+  <circle cx="25.5" cy="43" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="29.5" cy="44" r="1.1" fill="#283593" opacity="0.8"/>
+  
+  <circle cx="12.5" cy="50" r="1.1" fill="#283593" opacity="0.8"/>
+  <circle cx="16.5" cy="49" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="21" cy="48" r="1.2" fill="#283593" opacity="0.8"/>
+  <circle cx="25.5" cy="49" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="29.5" cy="50" r="1.1" fill="#283593" opacity="0.8"/>
+  
+  <circle cx="13.5" cy="56" r="1.1" fill="#283593" opacity="0.8"/>
+  <circle cx="17.5" cy="55" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="23.5" cy="55" r="1" fill="#283593" opacity="0.8"/>
+  <circle cx="27.5" cy="56" r="1.1" fill="#283593" opacity="0.8"/>
+  
+  <circle cx="16.5" cy="60" r="0.8" fill="#283593" opacity="0.7"/>
+  <circle cx="25.5" cy="60" r="0.8" fill="#283593" opacity="0.7"/>
+  
+  <!-- درخشش سطح -->
+  <path d="M14.5,40 Q13.5,48 14.5,56" 
+        fill="none" stroke="#ffffff" stroke-width="2" 
+        stroke-linecap="round" opacity="0.5"/>
+  <path d="M27.5,40 Q28.5,48 27.5,56" 
+        fill="none" stroke="#ffffff" stroke-width="2" 
+        stroke-linecap="round" opacity="0.5"/>
+  
+  <!-- ذرات سایش -->
+  <circle cx="10.5" cy="42" r="0.6" fill="#1a237e" opacity="0.5"/>
+  <circle cx="31.5" cy="46" r="0.6" fill="#1a237e" opacity="0.5"/>
+  <circle cx="10.5" cy="54" r="0.6" fill="#1a237e" opacity="0.5"/>
+  <circle cx="31.5" cy="56" r="0.6" fill="#1a237e" opacity="0.5"/>
+</g>
+<g id="fluoride-therapy" data-active="0" data-treatment="fluoride-therapy">
+  <!-- لایه اصلی فلوراید روی کل تاج -->
+  <path d="M10.5,33 
+           C10,40 9.5,48 10,55 
+           C10.5,60 13,63 16,63 
+           L23,63 
+           C26,63 28.5,60 29,55 
+           C29.5,48 29,40 28.5,33 
+           C28,31 27,30 19.5,30 
+           C12,30 11,31 10.5,33 Z" 
+        fill="#cddc39" 
+        fill-opacity="0.4" 
+        stroke="#9e9d24" 
+        stroke-width="1.2" 
+        stroke-linejoin="round"/>
+  
+  <!-- هاله درخشان اطراف دندان -->
+  <ellipse cx="19.5" cy="47" rx="13" ry="18" 
+           fill="#cddc39" 
+           fill-opacity="0.1" 
+           stroke="none"/>
+  
+  <!-- قطرات فلوراید روی سطح -->
+  <g opacity="0.85">
+    <ellipse cx="14" cy="40" rx="1.5" ry="2" fill="#ffffff" opacity="0.7"/>
+    <ellipse cx="25" cy="42" rx="1.3" ry="1.8" fill="#ffffff" opacity="0.7"/>
+    <ellipse cx="19.5" cy="50" rx="1.5" ry="2" fill="#ffffff" opacity="0.7"/>
+    <ellipse cx="15" cy="55" rx="1.2" ry="1.6" fill="#ffffff" opacity="0.6"/>
+    <ellipse cx="24" cy="56" rx="1.2" ry="1.6" fill="#ffffff" opacity="0.6"/>
+  </g>
+  
+  <!-- درخشش‌های ستاره‌ای (فلوراید براق) -->
+  <g opacity="0.95">
+    <!-- درخشش بالا چپ -->
+    <path d="M12,37 L12.5,39 L14.5,39.5 L12.5,40 L12,42 L11.5,40 L9.5,39.5 L11.5,39 Z" 
+          fill="#ffffff" 
+          stroke="#9e9d24" 
+          stroke-width="0.4"/>
+    <!-- درخشش بالا راست -->
+    <path d="M27,37 L27.5,39 L29.5,39.5 L27.5,40 L27,42 L26.5,40 L24.5,39.5 L26.5,39 Z" 
+          fill="#ffffff" 
+          stroke="#9e9d24" 
+          stroke-width="0.4"/>
+    <!-- درخشش پایین وسط -->
+    <path d="M19.5,57 L20,58.5 L21.5,59 L20,59.5 L19.5,61 L19,59.5 L17.5,59 L19,58.5 Z" 
+          fill="#ffffff" 
+          stroke="#9e9d24" 
+          stroke-width="0.4"/>
+  </g>
+  
+  <!-- بازتاب نور روی لایه -->
+  <path d="M13,38 C13.5,36 15,34.5 17,34" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        opacity="0.8"/>
+  <path d="M14,50 C14.5,48 15.5,46.5 16.5,45.5" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="1.3" 
+        stroke-linecap="round" 
+        opacity="0.6"/>
+  
+  <!-- خط‌های محافظ روی سطح -->
+  <g opacity="0.5">
+    <line x1="12" y1="44" x2="14" y2="46" stroke="#9e9d24" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="25" y1="44" x2="27" y2="46" stroke="#9e9d24" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="17" y1="58" x2="19" y2="60" stroke="#9e9d24" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="22" y1="58" x2="24" y2="60" stroke="#9e9d24" stroke-width="0.7" stroke-linecap="round"/>
+  </g>
+</g>
+
+<g id="biopsy" data-active="0" data-treatment="biopsy">
+  <!-- ناحیه لثه (بالای دندان - فک بالا) -->
+  <ellipse cx="19.5" cy="12" rx="11" ry="5" 
+           fill="#f79f9a" 
+           fill-opacity="0.4" 
+           stroke="#c62828" 
+           stroke-width="0.8"/>
+  
+  <!-- جای نمونه‌برداری روی لثه -->
+  <ellipse cx="19.5" cy="11" rx="3.5" ry="2.5" 
+           fill="#e53935" 
+           fill-opacity="0.75" 
+           stroke="#b71c1c" 
+           stroke-width="1.2"/>
+  
+  <!-- نقطه تیره داخل -->
+  <circle cx="19.5" cy="11" r="1.2" 
+          fill="#7f0000" 
+          opacity="0.85"/>
+  
+  <!-- خط‌های اطراف (نمایش بافت لثه) -->
+  <path d="M13,10 Q15,9 17,10" 
+        fill="none" 
+        stroke="#c62828" 
+        stroke-width="0.6" 
+        stroke-linecap="round"
+        opacity="0.7"/>
+  <path d="M22,10 Q24,9 26,10" 
+        fill="none" 
+        stroke="#c62828" 
+        stroke-width="0.6" 
+        stroke-linecap="round"
+        opacity="0.7"/>
+  
+  <!-- قطره خون کوچک -->
+  <circle cx="22" cy="12" r="0.8" 
+          fill="#c62828" 
+          opacity="0.7"/>
+</g>
+
+<g id="periodontitis-treatment" data-active="0" data-treatment="periodontitis-treatment">
+  <path id="bone-base" d="M39.6,17.5l-2.8,1.3c-2.6,1.5,0,9.3-2,11.7,0,4.8-4.6,3.8-5.9,3.7-3.9-.2-13.2,0-17.6,0s-5-3.1-5.1-3c-2.1,0-2.2-12.3-2.2-12.3l-1.5-2.2c-.2-.4-2.3-1-2.3-1.5V0h39.6v17.5h-.1Z" data-active="1" style="fill: #5e9ed652;"></path>
+  <path id="gum-base" d="M39.1,19.1c-1.1,1-2.7,1.7-3.2,3.1-1.1,3.6-.2,7.7-1.6,11.2-2.1,5.2-6,.4-9.9.5-3.9,0-8.2-.2-11.9.5-2.3.6-4.6,2.6-7,1.2-5.7-3.8-1.8-12.8-4-17.9-.2-.9-2.1-2.3-1.1-2.9,1.1-.5,4.1,1,4.5,2.2,2.1,3.8-1.9,14.1,3.5,15.5,2.6.3,8.3-.6,13.2-.9,3.7-.6,9.4.9,11.4-2.3,2.1-3.3-.1-8.2,2.5-11.3,2.6-3.1,5.5-1.2,3.8.9h0v.2h-.1Z" data-active="1" style="fill: #2196f3; opacity: 0.5;"></path>
+</g>
+
+<g id="laser-gum-therapy" data-active="0" data-treatment="laser-gum-therapy" >
+  <!-- ناحیه لثه تحت درمان -->
+  <ellipse cx="19.5" cy="25" rx="8" ry="5" 
+           fill="#ffcdd2" 
+           fill-opacity="0.5" 
+           stroke="#c62828" 
+           stroke-width="1"/>
+  
+  <!-- خطوط تابشی (انرژی لیزر) -->
+  <line x1="19.5" y1="25" x2="12" y2="18" 
+        stroke="#ff1744" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="19.5" y1="25" x2="16" y2="16" 
+        stroke="#ff1744" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+  <line x1="19.5" y1="25" x2="21" y2="15" 
+        stroke="#ff1744" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/>
+  <line x1="19.5" y1="25" x2="26" y2="16" 
+        stroke="#ff1744" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+  <line x1="19.5" y1="25" x2="28" y2="19" 
+        stroke="#ff1744" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- نقطه مرکزی لیزر -->
+  <circle cx="19.5" cy="25" r="2.5" 
+          fill="#ff1744" 
+          fill-opacity="0.6"/>
+  <circle cx="19.5" cy="25" r="1.2" 
+          fill="#ffffff"/>
+  
+  <!-- هاله درخشان -->
+  <circle cx="19.5" cy="25" r="4" 
+          fill="none" 
+          stroke="#ff5252" 
+          stroke-width="0.8" 
+          stroke-dasharray="2,2" 
+          opacity="0.6"/>
+</g>
+
+<g id="gum-contouring" data-active="0" data-treatment="gum-contouring">
+
+  <path d="M10,22 
+           Q14,19 19.5,19 
+           Q25,19 29,22 
+           Q30,26 29,30 
+           Q25,32 19.5,32 
+           Q14,32 10,30 
+           Q9,26 10,22 Z" 
+        fill="#f8bbd0" 
+        fill-opacity="0.7" 
+        stroke="#c2185b" 
+        stroke-width="1.2"
+        stroke-dasharray="4,2"/>
+  
+  <!-- خط برش (محل برداشت لثه) -->
+  <path d="M11,26 
+           Q19.5,23 28,26" 
+        fill="none" 
+        stroke="#d32f2f" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <!-- فلش‌های برداشت (رو به بالا) -->
+  <path d="M14,24 L14,20" 
+        stroke="#d32f2f" stroke-width="1.5" stroke-linecap="round"/>
+  <polyline points="12.5,21.5 14,19.5 15.5,21.5" 
+            fill="none" stroke="#d32f2f" stroke-width="1.5" 
+            stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <path d="M25,24 L25,20" 
+        stroke="#d32f2f" stroke-width="1.5" stroke-linecap="round"/>
+  <polyline points="23.5,21.5 25,19.5 26.5,21.5" 
+            fill="none" stroke="#d32f2f" stroke-width="1.5" 
+            stroke-linecap="round" stroke-linejoin="round"/>
+  
+
+  
+  <!-- ذرات برداشته شده (بافت) -->
+  <circle cx="15" cy="20" r="0.8" fill="#c2185b" opacity="0.6"/>
+  <circle cx="19.5" cy="19" r="0.8" fill="#c2185b" opacity="0.6"/>
+  <circle cx="24" cy="20" r="0.8" fill="#c2185b" opacity="0.6"/>
+</g>
+<g id="cosmetic-polishing" data-active="0" data-treatment="cosmetic-polishing">
+  <!-- ابزار پالیش (ستاره بزرگ) - ۱ پیکسل راست -->
+  <g transform="translate(20.5,48)">
+    <!-- خطوط ستاره‌ای (۱۲ خط از مرکز) -->
+    <line x1="0" y1="0" x2="0" y2="-12" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="6" y2="-10.4" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="10.4" y2="-6" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="12" y2="0" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="10.4" y2="6" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="6" y2="10.4" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="0" y2="12" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-6" y2="10.4" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-10.4" y2="6" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-12" y2="0" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-10.4" y2="-6" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-6" y2="-10.4" stroke="#00bcd4" stroke-width="1" stroke-linecap="round"/>
+    
+    <!-- خطوط مورب اضافه (۸ خط) -->
+    <line x1="0" y1="0" x2="3" y2="-4.5" stroke="#4dd0e1" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="4.5" y2="3" stroke="#4dd0e1" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-4.5" y2="3" stroke="#4dd0e1" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-3" y2="-4.5" stroke="#4dd0e1" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="8" y2="-2" stroke="#4dd0e1" stroke-width="0.6" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-8" y2="-2" stroke="#4dd0e1" stroke-width="0.6" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="8" y2="2" stroke="#4dd0e1" stroke-width="0.6" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-8" y2="2" stroke="#4dd0e1" stroke-width="0.6" stroke-linecap="round"/>
+    
+    <!-- مرکز ستاره -->
+    <circle cx="0" cy="0" r="3.5" fill="#00bcd4" fill-opacity="0.5"/>
+    <circle cx="0" cy="0" r="1.8" fill="#ffffff"/>
+  </g>
+  
+  <!-- خطوط حرکت (چرخش) -->
+  <path d="M11,48 Q10,52 11,56" 
+        fill="none" stroke="#4dd0e1" stroke-width="1" 
+        stroke-linecap="round" opacity="0.7"/>
+  <path d="M30,48 Q31,52 30,56" 
+        fill="none" stroke="#4dd0e1" stroke-width="1" 
+        stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- درخشش پالیش -->
+  <circle cx="13" cy="42" r="0.9" fill="#ffffff" opacity="0.9"/>
+  <circle cx="28" cy="42" r="0.9" fill="#ffffff" opacity="0.9"/>
+  <circle cx="20.5" cy="60" r="0.7" fill="#ffffff" opacity="0.8"/>
+</g>
+<!-- =========================================================
+     Occlusal / Incisal Adjustment - اصلاح اکلوژن
+     مناسب دندان قدامی
+     ========================================================= -->
+
+<g 
+   data-active="1"
+   >
+
+  <!-- ===== جهت اصلاح / تراش لبه اینسیزال ===== -->
+  <line x1="19.5" y1="47"
+        x2="19.5" y2="55"
+        stroke="#ef6c00"
+        stroke-width="2"
+        stroke-linecap="round"/>
+
+  <polygon points="16,54 19.5,59 23,54"
+           fill="#ef6c00"/>
+
+
+  <!-- ===== سطح ایده‌آل پس از اصلاح ===== -->
+  <line x1="9" y1="59"
+        x2="30" y2="59"
+        stroke="#1976d2"
+        stroke-width="1"
+        stroke-dasharray="2,1.5"
+        opacity="0.9"/>
+
+
+  <!-- ===== High Spot روی لبه اینسیزال ===== -->
+  <ellipse cx="19.5" cy="63"
+           rx="5"
+           ry="1.4"
+           fill="#e53935"
+           fill-opacity="0.4"
+           stroke="#e53935"
+           stroke-width="0.9"/>
+
+
+  <!-- ===== تماس دندان مقابل ===== -->
+  <line x1="19.5" y1="70"
+        x2="19.5" y2="66"
+        stroke="#e53935"
+        stroke-width="2"
+        stroke-linecap="round"/>
+
+  <polygon points="16.5,66 19.5,62 22.5,66"
+           fill="#e53935"/>
+
+</g>
+
+
+
+
   </svg>
