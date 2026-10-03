@@ -7,12 +7,11 @@ import {
   type StatusRadio,
 } from "./statusGroups";
 import { isItemChecked, getRadioValue } from "./statusToState";
-import { getToothState } from "../odontogram";
 import { submitStatus, unsubmitStatus } from "./applyTreatment";
 
 const props = defineProps<{
   patientId: string;
-  toothNo: number;
+  toothNos: number[];
   toothState: Record<string, unknown> | null;
 }>();
 
@@ -22,9 +21,49 @@ const emit = defineEmits<{
 
 const activeGroup = ref<StatusGroup>("presence");
 
+// ⭐ گروه‌های مرتبط (برای زیرتب‌ها)
+const applicableGroups = computed(() => {
+  if (!props.toothState) return STATUS_GROUPS;
+
+  const filtered = STATUS_GROUPS.filter((g) => {
+    if (!g.appliesWhen) return true;
+    return g.appliesWhen(props.toothState!);
+  });
+
+  // Safety net
+  if (filtered.length === 0) return STATUS_GROUPS;
+
+  return filtered;
+});
+
+// ⭐ گروه فعال
 const currentGroup = computed(() =>
-  STATUS_GROUPS.find((g) => g.id === activeGroup.value),
+  applicableGroups.value.find((g) => g.id === activeGroup.value),
 );
+
+// ⭐ آیتم‌های فیلترشده
+const applicableItems = computed(() => {
+  const group = currentGroup.value;
+  if (!group?.items) return [];
+  if (!props.toothState) return group.items;
+
+  return group.items.filter((item) => {
+    if (!item.appliesWhen) return true;
+    return item.appliesWhen(props.toothState!);
+  });
+});
+
+// ⭐ رادیوهای فیلترشده
+const applicableRadios = computed(() => {
+  const group = currentGroup.value;
+  if (!group?.radios) return [];
+  if (!props.toothState) return group.radios;
+
+  return group.radios.filter((radio) => {
+    if (!radio.appliesWhen) return true;
+    return radio.appliesWhen(props.toothState!);
+  });
+});
 
 const localChecked = ref<Record<string, boolean>>({});
 
@@ -44,7 +83,7 @@ function refreshLocal() {
 }
 
 watch(
-  () => props.toothNo,
+  () => [...props.toothNos],
   () => refreshLocal(),
   { immediate: true },
 );
@@ -55,28 +94,32 @@ watch(
   { deep: true },
 );
 
-// ⬇️ امضاها از StatusGroup به string تغییر کردند
+// ⭐ اطمینان از اینکه activeGroup همیشه معتبر باشد
+watch(applicableGroups, (groups) => {
+  if (!groups.find((g) => g.id === activeGroup.value)) {
+    activeGroup.value = groups[0]?.id ?? "presence";
+  }
+}, { immediate: true });
+
 function onToggleCheckbox(group: string, item: StatusItem, ev: Event) {
   const checked = (ev.target as HTMLInputElement).checked;
   const key = `${group}:${item.id}`;
   localChecked.value[key] = checked;
 
-  if (checked) {
-    submitStatus(
-      props.patientId,
-      props.toothNo,
-      group,
-      item.id,
-      (item.value ?? true) as boolean | string,
-    );
-  } else {
-    unsubmitStatus(props.patientId, props.toothNo, group, item.id);
+  for (const toothNo of props.toothNos) {
+    if (checked) {
+      submitStatus(props.patientId, toothNo, group, item.id, item.value ?? true);
+    } else {
+      unsubmitStatus(props.patientId, toothNo, group, item.id);
+    }
   }
   emit("change");
 }
 
 function onRadioChange(group: string, radio: StatusRadio, value: string) {
-  submitStatus(props.patientId, props.toothNo, group, radio.field, value);
+  for (const toothNo of props.toothNos) {
+    submitStatus(props.patientId, toothNo, group, radio.field, value);
+  }
   emit("change");
 }
 
@@ -92,9 +135,10 @@ function isChecked(group: string, item: StatusItem): boolean {
 
 <template>
   <div class="status-form" dir="rtl">
+    <!-- زیرتب‌های گروهی — فقط گروه‌های مرتبط -->
     <div class="group-tabs">
       <button
-        v-for="g in STATUS_GROUPS"
+        v-for="g in applicableGroups"
         :key="g.id"
         :class="['group-tab', { active: activeGroup === g.id }]"
         @click="activeGroup = g.id"
@@ -104,11 +148,12 @@ function isChecked(group: string, item: StatusItem): boolean {
       </button>
     </div>
 
+    <!-- محتوای گروه فعال -->
     <div v-if="currentGroup" class="group-body">
       <!-- Radio ها -->
-      <div v-if="currentGroup.radios?.length" class="radio-section">
+      <div v-if="applicableRadios.length" class="radio-section">
         <div
-          v-for="radio in currentGroup.radios"
+          v-for="radio in applicableRadios"
           :key="radio.field"
           class="radio-row"
         >
@@ -126,7 +171,7 @@ function isChecked(group: string, item: StatusItem): boolean {
                 :value="opt.value"
                 :checked="getRadio(currentGroup.id, radio) === opt.value"
                 @change="onRadioChange(currentGroup.id, radio, opt.value)"
-              />
+              >
               <span>{{ opt.label }}</span>
             </label>
           </div>
@@ -134,9 +179,9 @@ function isChecked(group: string, item: StatusItem): boolean {
       </div>
 
       <!-- Checkbox ها -->
-      <div v-if="currentGroup.items.length" class="check-list">
+      <div v-if="applicableItems.length" class="check-list">
         <label
-          v-for="item in currentGroup.items"
+          v-for="item in applicableItems"
           :key="item.id"
           class="check-item"
           :class="{ checked: isChecked(currentGroup.id, item) }"
@@ -145,21 +190,21 @@ function isChecked(group: string, item: StatusItem): boolean {
             type="checkbox"
             :checked="isChecked(currentGroup.id, item)"
             @change="onToggleCheckbox(currentGroup.id, item, $event)"
-          />
+          >
           <span>{{ item.label }}</span>
         </label>
       </div>
 
+      <!-- پیام خالی -->
       <div
-        v-if="!currentGroup.items.length && !currentGroup.radios?.length"
+        v-if="!applicableItems.length && !applicableRadios.length"
         class="empty-hint"
       >
-        گزینه‌ای برای این گروه تعریف نشده
+        گزینه‌ای برای این دندان وجود ندارد
       </div>
     </div>
   </div>
 </template>
-
 
 <style scoped>
 .status-form {
@@ -168,7 +213,6 @@ function isChecked(group: string, item: StatusItem): boolean {
   gap: 12px;
 }
 
-/* ─── زیرتب‌های ۱۲ گروهی ─── */
 .group-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -207,14 +251,12 @@ function isChecked(group: string, item: StatusItem): boolean {
   font-size: 14px;
 }
 
-/* ─── بدنه گروه ─── */
 .group-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* ─── Radio ─── */
 .radio-section {
   display: flex;
   flex-direction: column;
@@ -269,7 +311,6 @@ function isChecked(group: string, item: StatusItem): boolean {
   display: none;
 }
 
-/* ─── Checkbox ─── */
 .check-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

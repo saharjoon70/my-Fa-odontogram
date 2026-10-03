@@ -197,7 +197,12 @@ export function statusRadioToPatch(
   if (isEnumField(field)) {
     return { [field]: value };
   }
-
+if (field === "toothSelection") {
+  return { toothSelection: value };
+}
+if (field === "toothSubstrate") {
+  return { toothSubstrate: value };
+}
   console.warn("[statusToState] unhandled radio field:", field);
   return null;
 }

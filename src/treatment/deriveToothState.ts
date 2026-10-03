@@ -489,7 +489,8 @@ const CUSTOM_SVG_TREATMENTS = [
   "periodontitis-treatment",
   "laser-gum-therapy",
   "gum-contouring",
-  "cosmetic-polishing"
+  "cosmetic-polishing",
+  "bite-plate"
   // هر سرویس دیگری که SVG سفارشی دارد
 ];
 

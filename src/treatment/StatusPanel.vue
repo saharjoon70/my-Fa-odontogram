@@ -92,10 +92,10 @@ function removeStatusRecord(id: string) {
     <!-- فرم وضعیت -->
     <template v-else>
       <StatusForm
-        :patient-id="patientId"
-        :tooth-no="activeTooth"
-        :tooth-state="toothState"
-        @change="refresh"
+             :patient-id="patientId"
+             :tooth-nos="selectedTeeth"        
+             :tooth-state="toothState"
+             @change="refresh"
       />
 
       <!-- تاریخچه وضعیت‌های ثبت‌شده -->

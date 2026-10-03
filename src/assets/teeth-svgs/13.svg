@@ -1501,7 +1501,7 @@
   <circle cx="20.5" cy="60" r="0.7" fill="#ffffff" opacity="0.8"/>
 </g>
 
-<g data-active="1">
+<g id="bite-plate" data-active="0" data-treatment="bite-plate">
   <!-- بدنه اصلی بایت‌پلیت - لایه شیشه‌ای روی کل تاج -->
   <path d="M9.5,33 
            C9.5,33 9,50 10,58 
