@@ -32,15 +32,21 @@ export interface StatusItem {
   field?: ToothStateField;
   value?: unknown;
   clearOnUncheck?: boolean;
-  /** ⭐ چه زمانی این آیتم معنی دارد؟ */
   appliesWhen?: (state: Record<string, unknown>) => boolean;
 }
+
 
 export interface StatusRadio {
   field: ToothStateField;
   label: string;
   options: StatusRadioOption[];
   /** ⭐ چه زمانی این رادیو معنی دارد؟ */
+  appliesWhen?: (state: Record<string, unknown>) => boolean;
+}
+export interface StatusSelect {
+  field: ToothStateField;
+  label: string;
+  options: StatusRadioOption[];
   appliesWhen?: (state: Record<string, unknown>) => boolean;
 }
 
@@ -50,19 +56,18 @@ export interface StatusGroupMeta {
   icon: string;
   items: StatusItem[];
   radios?: StatusRadio[];
-  /** ⭐ چه زمانی این گروه معنی دارد؟ */
+  selects?: StatusSelect[];   // ⭐ این را اضافه کن
   appliesWhen?: (state: Record<string, unknown>) => boolean;
 }
-
 // ═══════════════════════════════════════════════
 // Helper functions
 // ═══════════════════════════════════════════════
 function isToothBase(s: Record<string, unknown>): boolean {
   return s.toothSelection === "tooth-base";
 }
-function isMilktooth(s: Record<string, unknown>): boolean {
-  return s.toothSelection === "milktooth";
-}
+// function isMilktooth(s: Record<string, unknown>): boolean {
+//   return s.toothSelection === "milktooth";
+// }
 function isImplant(s: Record<string, unknown>): boolean {
   return s.toothSelection === "implant";
 }
@@ -124,71 +129,73 @@ export const STATUS_GROUPS: StatusGroupMeta[] = [
   // ═══════════════════════════════════════════════
   // ۲. تاج
   // ═══════════════════════════════════════════════
-  {
-    id: "crown",
-    label: "تاج",
-    icon: "👑",
-    appliesWhen: isPresent,
-    items: [
-      {
-        id: "brokenMesial",
-        label: "شکستگی مزیال",
-        field: "brokenMesial",
-        appliesWhen: (s) => isNatural(s) || isBroken(s),
-      },
-      {
-        id: "brokenIncisal",
-        label: "شکستگی اینسیزال",
-        field: "brokenIncisal",
-        appliesWhen: (s) => isNatural(s) || isBroken(s),
-      },
-      {
-        id: "brokenDistal",
-        label: "شکستگی دیستال",
-        field: "brokenDistal",
-        appliesWhen: (s) => isNatural(s) || isBroken(s),
-      },
-      {
-        id: "cracked",
-        label: "ترک تاج",
-        field: "customStates.cracked",
-        value: true,
-        appliesWhen: isNatural,
-      },
-      {
-        id: "leakage",
-        label: "نشت تاج",
-        field: "crownLeakage",
-        appliesWhen: hasRestoration,
-      },
-      {
-        id: "worn",
-        label: "تاج فرسوده",
-        field: "wearEdge",
-        value: "attrition",
-        appliesWhen: (s) => isNatural(s) && hasNoRestoration(s),
-      },
-      {
-        id: "needsReplace",
-        label: "نیاز به تعویض",
-        field: "crownReplace",
-        appliesWhen: hasRestoration,
-      },
-    ],
-    radios: [
-      {
-        field: "toothSubstrate",
-        label: "ساختار دندان",
-        appliesWhen: isToothBase,
-        options: [
-          { value: "natural",   label: "سالم" },
-          { value: "radix",     label: "ریشه باقی‌مانده" },
-          { value: "broken",    label: "شکسته" },
-          { value: "crownprep", label: "آماده روکش" },
-        ],
-      },
-    ],
-  },
+{
+  id: "crown",
+  label: "تاج",
+  icon: "👑",
+  appliesWhen: isPresent,
+  items: [
+    { id: "brokenMesial",  label: "شکستگی مزیال",   field: "brokenMesial",  appliesWhen: (s) => isNatural(s) || isBroken(s) },
+    { id: "brokenIncisal", label: "شکستگی اینسیزال", field: "brokenIncisal", appliesWhen: (s) => isNatural(s) || isBroken(s) },
+    { id: "brokenDistal",  label: "شکستگی دیستال",   field: "brokenDistal",  appliesWhen: (s) => isNatural(s) || isBroken(s) },
+    { id: "cracked",       label: "ترک تاج",         field: "customStates.cracked", value: true, appliesWhen: isNatural },
+    { id: "leakage",       label: "نشت تاج",         field: "crownLeakage", appliesWhen: hasRestoration },
+    { id: "contactMesial", label: "فقدان تماس مزیال",  field: "contactMesial", appliesWhen: (s) => isNatural(s) || isCrownprep(s) },
+    { id: "contactDistal", label: "فقدان تماس دیستال", field: "contactDistal", appliesWhen: (s) => isNatural(s) || isCrownprep(s) },
+    { id: "fractureVertical",   label: "شکستگی عمودی", field: "customStates.fractureVertical",   value: true, appliesWhen: isPresent },
+    { id: "fractureHorizontal", label: "شکستگی افقی",  field: "customStates.fractureHorizontal", value: true, appliesWhen: isPresent },
+    { id: "crownNeeded",    label: "نیاز به روکش",         field: "crownNeeded", appliesWhen: (s) => isNatural(s) || isBroken(s) },
+    { id: "needsReplace",   label: "نیاز به تعویض روکش",    field: "crownReplace", appliesWhen: hasRestoration },
+    { id: "extractionPlan", label: "کشیدن برنامه‌ریزی شده", field: "extractionPlan", appliesWhen: isPresent },
+    { id: "missingClosed",  label: "بسته‌شدن فاصله",        field: "missingClosed", appliesWhen: isPresent },
+  ],
+  radios: [
+    {
+      field: "toothSubstrate",
+      label: "ساختار دندان",
+      appliesWhen: isToothBase,
+      options: [
+        { value: "natural",   label: "سالم" },
+        { value: "radix",     label: "ریشه باقی‌مانده" },
+        { value: "broken",    label: "شکسته" },
+        { value: "crownprep", label: "آماده روکش" },
+      ],
+    },
+  ],
+  selects: [
+    // ⭐ ترمیم — اینجا
+    {
+      field: "restorationType",
+      label: "ترمیم",
+      appliesWhen: (s) => (isToothBase(s) || isCrownprep(s)) && (isNatural(s) || isBroken(s) || isRadix(s)),
+      options: [
+        { value: "none",    label: "—" },
+        { value: "crown",   label: "روکش" },
+        { value: "inlay",   label: "اینله" },
+        { value: "onlay",   label: "آنله" },
+        { value: "veneer",  label: "ونیر" },
+        { value: "bridge",  label: "بریج" },
+      ],
+    },
+    // ⭐ جنس ترمیم — فقط وقتی ترمیم انتخاب شده
+    {
+      field: "restorationMaterial",
+      label: "جنس ترمیم",
+      appliesWhen: (s) => s.restorationType !== "none" && s.restorationType !== undefined,
+      options: [
+        { value: "none",          label: "—" },
+        { value: "zircon",        label: "زیرکونیا" },
+        { value: "emax",          label: "e.max" },
+        { value: "gold",          label: "طلا" },
+        { value: "gradia",        label: "گرادیا" },
+        { value: "metal",         label: "فلز" },
+        { value: "metal-ceramic", label: "PFM (فلز-سرامیک)" },
+        { value: "telescope",     label: "تلسکوپی" },
+        { value: "temporary",     label: "موقت" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۳. پوسیدگی
@@ -223,186 +230,280 @@ export const STATUS_GROUPS: StatusGroupMeta[] = [
   // ═══════════════════════════════════════════════
   // ۴. پرکردگی
   // ═══════════════════════════════════════════════
-  {
-    id: "filling",
-    label: "پرکردگی",
-    icon: "🔧",
-    appliesWhen: (s) => isPresent(s) && !isImplant(s),
-    items: [
-      { id: "fillComposite", label: "کامپوزیت",  field: "fillingSurfaceMaterials", value: { material: "composite" } },
-      { id: "fillAmalgam",   label: "آمالگام",    field: "fillingSurfaceMaterials", value: { material: "amalgam" } },
-      { id: "fillGic",       label: "GIC",        field: "fillingSurfaceMaterials", value: { material: "gic" } },
-      { id: "inlay",         label: "اینلی",      field: "restorationType", value: "inlay" },
-      { id: "onlay",         label: "آنلی",       field: "restorationType", value: "onlay" },
-      { id: "fillBroken",    label: "شکسته",      field: "fillingDefect", value: { defect: "fracture" } },
-      { id: "fillDefect",    label: "لب‌پریده",    field: "fillingDefect", value: { defect: "marginal" } },
-    ],
-  },
+{
+  id: "filling",
+  label: "پرکردگی",
+  icon: "🔧",
+  
+  appliesWhen: (s) => isPresent(s) && !isImplant(s),
+    surfaceCross: true,    // ⭐ جدید
+  items: [
+    { id: "fillBroken", label: "شکسته",    field: "fillingDefect", value: { defect: "fracture" } },
+    { id: "fillDefect", label: "لب‌پریده",  field: "fillingDefect", value: { defect: "marginal" } },
+    { id: "fissureSealing", label: "فیشور سیلانت", field: "fissureSealing" },
+  ],
+  radios: [
+    {
+      field: "fillingMaterial",
+      label: "جنس پرکردگی",
+      options: [
+        { value: "none",      label: "—" },
+        { value: "composite", label: "کامپوزیت" },
+        { value: "amalgam",   label: "آمالگام" },
+        { value: "gic",       label: "GIC" },
+        { value: "temporary", label: "موقت" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۵. پالپ
   // ═══════════════════════════════════════════════
-  {
-    id: "pulp",
-    label: "پالپ",
-    icon: "🩺",
-    appliesWhen: (s) => isPresent(s) && !isImplant(s),
-    items: [],
-    radios: [
-      {
-        field: "pulpDx",
-        label: "وضعیت پالپ",
-        options: [
-          { value: "normal",                label: "نرمال" },
-          { value: "reversible-pulpitis",   label: "پالپیت برگشت‌پذیر" },
-          { value: "irreversible-pulpitis", label: "پالپیت برگشت‌ناپذیر" },
-          { value: "necrosis",              label: "نکروز" },
-          { value: "endo-filling",          label: "درمان‌شده (اندو)" },
-        ],
-      },
-    ],
-  },
+{
+  id: "pulp",
+  label: "پالپ",
+  icon: "🩺",
+  appliesWhen: (s) => isPresent(s) && !isImplant(s),
+  items: [
+    { id: "parapulpalPin", label: "پین پاراپالپال", field: "parapulpalPin" },
+  ],
+  radios: [
+    {
+      field: "pulpDx",
+      label: "وضعیت پالپ",
+      options: [
+        { value: "normal",                label: "نرمال" },
+        { value: "reversible-pulpitis",   label: "پالپیت برگشت‌پذیر" },
+        { value: "irreversible-pulpitis", label: "پالپیت برگشت‌ناپذیر" },
+        { value: "necrosis",              label: "نکروز" },
+      ],
+    },
+    {
+      field: "endo",
+      label: "اندو",
+      appliesWhen: (s) => isPresent(s) && !isImplant(s),
+      options: [
+        { value: "none",                  label: "—" },
+        { value: "endo-medical-filling",  label: "پرکردگی دارویی" },
+        { value: "endo-filling",          label: "پرکردگی کامل" },
+        { value: "endo-filling-incomplete", label: "پرکردگی ناقص" },
+        { value: "endo-glass-pin",        label: "پین شیشه‌ای" },
+        { value: "endo-metal-pin",        label: "پین فلزی" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۶. آپیکال
   // ═══════════════════════════════════════════════
-  {
-    id: "apical",
-    label: "آپیکال",
-    icon: "🔬",
-    appliesWhen: (s) => isPresent(s) && !isImplant(s),
-    items: [],
-    radios: [
-      {
-        field: "apicalDx",
-        label: "وضعیت آپیکال",
-        options: [
-          { value: "normal",                            label: "نرمال" },
-          { value: "symptomatic-apical-periodontitis",  label: "پریودنتیت حاد" },
-          { value: "asymptomatic-apical-periodontitis", label: "پریودنتیت مزمن" },
-          { value: "acute-apical-abscess",              label: "آبسه حاد" },
-          { value: "chronic-apical-abscess",            label: "آبسه مزمن" },
-          { value: "condensing-osteitis",               label: "استئیت کندانس" },
-        ],
-      },
-      {
-        field: "periapicalType",
-        label: "نوع ضایعه",
-        options: [
-          { value: "none",      label: "—" },
-          { value: "cyst",      label: "کیست" },
-          { value: "granuloma", label: "گرانولوم" },
-        ],
-      },
-    ],
-  },
+{
+  id: "apical",
+  label: "آپیکال",
+  icon: "🔬",
+  appliesWhen: (s) => isPresent(s) && !isImplant(s),
+  items: [
+    { id: "endoResection", label: "رزکسیون", field: "endoResection" },
+  ],
+  radios: [
+    {
+      field: "apicalDx",
+      label: "وضعیت آپیکال",
+      options: [
+        { value: "normal",                            label: "نرمال" },
+        { value: "symptomatic-apical-periodontitis",  label: "پریودنتیت حاد" },
+        { value: "asymptomatic-apical-periodontitis", label: "پریودنتیت مزمن" },
+        { value: "acute-apical-abscess",              label: "آبسه حاد" },
+        { value: "chronic-apical-abscess",            label: "آبسه مزمن" },
+        { value: "condensing-osteitis",               label: "استئیت کندانس" },
+      ],
+    },
+    {
+      field: "periapicalType",
+      label: "نوع ضایعه",
+      options: [
+        { value: "none",      label: "—" },
+        { value: "cyst",      label: "کیست" },
+        { value: "granuloma", label: "گرانولوم" },
+      ],
+    },
+    {
+      field: "resorptionType",
+      label: "جذب ریشه",
+      options: [
+        { value: "none",              label: "—" },
+        { value: "internal",          label: "داخلی" },
+        { value: "external-cervical", label: "خارجی گردنی" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۷. لثه
   // ═══════════════════════════════════════════════
-  {
-    id: "perio",
-    label: "لثه",
-    icon: "🩸",
-    appliesWhen: isPresent,
-    items: [
-      { id: "calculus",    label: "جرم‌گرفتگی",     field: "calculus" },
-      { id: "plaque",      label: "پلاک",           field: "customStates.plaque", value: true },
-      { id: "bop",         label: "خونریزی",         field: "customStates.bleedingOnProbing", value: true },
-      { id: "gingivitis",  label: "التهاب لثه",      field: "mods", value: "parodontal" },
-      { id: "recession",   label: "تحلیل لثه",       field: "customStates.gingivalRecession", value: true },
-      { id: "pocket",      label: "جیب پریو",        field: "customStates.periodontalPocket", value: true },
-      { id: "suppuration", label: "چرک",            field: "customStates.suppuration", value: true },
-      { id: "paleGum",     label: "لثه رنگ‌پریده",   field: "customStates.paleGum", value: true },
-    ],
-    radios: [
-      {
-        field: "mobility",
-        label: "تحرک",
-        appliesWhen: (s) => isPresent(s) && !isImplant(s),
-        options: [
-          { value: "none", label: "۰" },
-          { value: "m1",   label: "۱" },
-          { value: "m2",   label: "۲" },
-          { value: "m3",   label: "۳" },
-        ],
-      },
-    ],
-  },
+{
+  id: "perio",
+  label: "لثه",
+  icon: "🩸",
+  appliesWhen: isPresent,
+  items: [
+    { id: "calculus",    label: "جرم‌گرفتگی",     field: "calculus" },
+    { id: "plaque",      label: "پلاک",           field: "customStates.plaque", value: true },
+    { id: "bop",         label: "خونریزی",         field: "customStates.bleedingOnProbing", value: true },
+    { id: "gingivitis",  label: "التهاب لثه",      field: "mods", value: "parodontal" },
+    { id: "recession",   label: "تحلیل لثه",       field: "customStates.gingivalRecession", value: true },
+    { id: "pocket",      label: "جیب پریو",        field: "customStates.periodontalPocket", value: true },
+    { id: "suppuration", label: "چرک",            field: "customStates.suppuration", value: true },
+    { id: "paleGum",     label: "لثه رنگ‌پریده",   field: "customStates.paleGum", value: true },
+  ],
+  radios: [
+    {
+      field: "mobility",
+      label: "تحرک",
+      appliesWhen: (s) => isPresent(s) && !isImplant(s),
+      options: [
+        { value: "none", label: "۰" },
+        { value: "m1",   label: "۱" },
+        { value: "m2",   label: "۲" },
+        { value: "m3",   label: "۳" },
+      ],
+    },
+    {
+      field: "periImplant",
+      label: "وضعیت ایمپلنت",
+      appliesWhen: isImplant,
+      options: [
+        { value: "none",                       label: "—" },
+        { value: "mucositis",                  label: "موکوزیت" },
+        { value: "peri-implantitis-mild",      label: "پری‌ایمپلنتیت خفیف" },
+        { value: "peri-implantitis-moderate",  label: "پری‌ایمپلنتیت متوسط" },
+        { value: "peri-implantitis-severe",    label: "پری‌ایمپلنتیت شدید" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۸. سایش
   // ═══════════════════════════════════════════════
-  {
-    id: "wear",
-    label: "سایش",
-    icon: "⚙️",
-    appliesWhen: (s) => isToothBase(s) && isNatural(s) && hasNoRestoration(s),
-    items: [
-      { id: "wearEdge",     label: "سایش لبه",     field: "wearEdge", value: "attrition" },
-      { id: "wearCervical", label: "سایش گردنی",   field: "wearCervical", value: "abrasion" },
-      { id: "wearOcclusal", label: "سایش اکلوزال", field: "wearEdge", value: "erosion" },
-      { id: "bruxism",      label: "براکسیزم",     field: "customStates.bruxism", value: true },
-    ],
-  },
+{
+  id: "wear",
+  label: "سایش",
+  icon: "⚙️",
+  appliesWhen: (s) => isToothBase(s) && isNatural(s) && hasNoRestoration(s),
+  items: [
+    { id: "bruxism", label: "براکسیزم", field: "customStates.bruxism", value: true },
+  ],
+  selects: [
+    {
+      field: "wearEdge",
+      label: "سایش لبه‌ای",
+      options: [
+        { value: "none",      label: "هیچ" },
+        { value: "attrition", label: "سایش دندانی (اتریشن)" },
+        { value: "erosion",   label: "فرسایش شیمیایی (اروژن)" },
+      ],
+    },
+    {
+      field: "wearCervical",
+      label: "سایش گردنی",
+      options: [
+        { value: "none",       label: "هیچ" },
+        { value: "abrasion",   label: "سایش مکانیکی (ابریژن)" },
+        { value: "abfraction", label: "آبفراکشن" },
+        { value: "erosion",    label: "فرسایش شیمیایی (اروژن)" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۹. رنگ
   // ═══════════════════════════════════════════════
-  {
-    id: "color",
-    label: "رنگ",
-    icon: "🎨",
-    appliesWhen: (s) => isPresent(s) && isNatural(s) && hasNoRestoration(s),
-    items: [
-      { id: "extrinsic",     label: "خارجی",         field: "discoloration", value: "extrinsic" },
-      { id: "intrinsic",     label: "داخلی",         field: "discoloration", value: "other" },
-      { id: "fluorosis",     label: "فلوروزیس",      field: "discoloration", value: "fluorosis" },
-      { id: "trauma",        label: "ناشی از ضربه",  field: "discoloration", value: "nonvital" },
-      { id: "necroticColor", label: "نکروز پالپ",    field: "discoloration", value: "nonvital" },
-    ],
-  },
-
+{
+  id: "color",
+  label: "رنگ",
+  icon: "🎨",
+  appliesWhen: (s) => isToothBase(s) && isNatural(s) && hasNoRestoration(s),
+  items: [],
+  selects: [
+    {
+      field: "discoloration",
+      label: "تغییر رنگ",
+      options: [
+        { value: "none",         label: "هیچ" },
+        { value: "tetracycline", label: "لکه تتراسایکلین" },
+        { value: "fluorosis",    label: "فلوروزیس" },
+        { value: "nonvital",     label: "تیرگی دندان غیرزنده" },
+        { value: "extrinsic",    label: "لکه بیرونی" },
+        { value: "other",        label: "سایر / ناشناخته" },
+      ],
+    },
+  ],
+},
   // ═══════════════════════════════════════════════
   // ۱۰. نظم
   // ═══════════════════════════════════════════════
-  {
-    id: "alignment",
-    label: "نظم",
-    icon: "📐",
-    appliesWhen: isPresent,
-    items: [
-      { id: "rotation",    label: "چرخش",           field: "orthoRotation", value: true },
-      { id: "driftMesial", label: "جابجایی مزیال",  field: "orthoDrift", value: "mesial" },
-      { id: "driftDistal", label: "جابجایی دیستال", field: "orthoDrift", value: "distal" },
-      { id: "extrusion",   label: "اکستروژن",       field: "orthoVertical", value: "extrusion" },
-      { id: "intrusion",   label: "اینتروژن",       field: "orthoVertical", value: "intrusion" },
-      { id: "crowding",    label: "فشردگی",         field: "customStates.crowding", value: true },
-      { id: "diastema",    label: "فاصله",          field: "customStates.diastema", value: true },
-      { id: "crossbite",   label: "کراس‌بایت",       field: "customStates.crossbite", value: true },
-    ],
-  },
-
+{
+  id: "alignment",
+  label: "نظم",
+  icon: "📐",
+  appliesWhen: isPresent,
+  items: [
+    { id: "rotation", label: "چرخش", field: "orthoRotation", value: true },
+    { id: "crowding", label: "فشردگی", field: "customStates.crowding", value: true },
+    { id: "diastema", label: "فاصله", field: "customStates.diastema", value: true },
+    { id: "crossbite", label: "کراس‌بایت", field: "customStates.crossbite", value: true },
+  ],
+  selects: [
+    {
+      field: "orthoDrift",
+      label: "جابجایی",
+      options: [
+        { value: "none",   label: "—" },
+        { value: "mesial", label: "مزیال" },
+        { value: "distal", label: "دیستال" },
+      ],
+    },
+    {
+      field: "orthoVertical",
+      label: "حرکت عمودی",
+      options: [
+        { value: "none",      label: "—" },
+        { value: "extrusion", label: "اکستروژن" },
+        { value: "intrusion", label: "اینتروژن" },
+      ],
+    },
+  ],
+},
   // ═══════════════════════════════════════════════
   // ۱۱. اپلاینس
   // ═══════════════════════════════════════════════
-  {
-    id: "appliance",
-    label: "اپلاینس",
-    icon: "🦿",
-    appliesWhen: isPresent,
-    items: [
-      { id: "bracket",           label: "براکت دارد",      field: "orthoAppliance", value: "bracket" },
-      { id: "fixedRetainer",     label: "ریتینر ثابت",     field: "orthoAppliance", value: "band" },
-      { id: "removableRetainer", label: "ریتینر متحرک",    field: "customStates.removableRetainer", value: true },
-      { id: "spaceMaintainer",   label: "نگهدارنده فضا",   field: "customStates.spaceMaintainer", value: true },
-      { id: "crown",             label: "روکش دارد",       field: "restorationType", value: "crown" },
-      { id: "bridge",            label: "بریج دارد",       field: "restorationType", value: "bridge" },
-      { id: "veneer",            label: "ونیر دارد",       field: "restorationType", value: "veneer" },
-      { id: "partialDenture",    label: "پروتز پارسیل",    field: "prosthesis", value: "removable-partial" },
-      { id: "fullDenture",       label: "پروتز کامل",      field: "prosthesis", value: "removable-full" },
-    ],
-  },
+{
+  id: "appliance",
+  label: "اپلاینس",
+  icon: "🦿",
+  appliesWhen: isPresent,
+  items: [
+    { id: "removableRetainer", label: "ریتینر متحرک", field: "customStates.removableRetainer", value: true },
+    { id: "spaceMaintainer",   label: "نگهدارنده فضا", field: "customStates.spaceMaintainer", value: true },
+    { id: "partialDenture",    label: "پروتز پارسیل", field: "prosthesis", value: "removable-partial" },
+    { id: "fullDenture",       label: "پروتز کامل",   field: "prosthesis", value: "removable-full" },
+  ],
+  selects: [
+    {
+      field: "orthoAppliance",
+      label: "اپلاینس",
+      options: [
+        { value: "none",    label: "—" },
+        { value: "bracket", label: "براکت" },
+        { value: "band",    label: "بند" },
+      ],
+    },
+  ],
+},
 
   // ═══════════════════════════════════════════════
   // ۱۲. سایر — همیشه نمایش

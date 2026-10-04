@@ -10,7 +10,18 @@ import {
 import { getRecordsForTooth } from "./treatmentStore";
 import { getRecordLabel } from "./deriveToothState";
 import type { OdontogramRecord } from "./treatmentStore";
+import { STATUS_EXTRAS } from "./status_extras";
+import { applyStatusExtraPreset } from "./applyTreatment";
 
+const selectedExtraId = ref<string>("");
+
+function applyExtra() {
+  if (!selectedExtraId.value) return;
+  const extra = STATUS_EXTRAS.options.find((o) => o.id === selectedExtraId.value);
+  if (!extra) return;
+  applyStatusExtraPreset(props.patientId, extra);
+  selectedExtraId.value = "";
+}
 const props = defineProps<{
   patientId: string;
 }>();
@@ -97,7 +108,29 @@ function removeStatusRecord(id: string) {
              :tooth-state="toothState"
              @change="refresh"
       />
-
+<!-- بخش افزودن سریع -->
+<div class="status-extras">
+  <div class="extras-row">
+    <span class="extras-label">افزودن سریع:</span>
+    <select v-model="selectedExtraId" class="extras-select">
+      <option value="">— انتخاب کنید —</option>
+      <option
+        v-for="opt in STATUS_EXTRAS.options"
+        :key="opt.id"
+        :value="opt.id"
+      >
+        {{ opt.label }}
+      </option>
+    </select>
+    <button
+      class="extras-apply"
+      :disabled="!selectedExtraId"
+      @click="applyExtra"
+    >
+      تأیید
+    </button>
+  </div>
+</div>
       <!-- تاریخچه وضعیت‌های ثبت‌شده -->
       <div v-if="statusRecords.length > 0" class="status-history">
         <h4>وضعیت‌های ثبت‌شده ({{ statusRecords.length }})</h4>
@@ -203,5 +236,54 @@ function removeStatusRecord(id: string) {
 
 .rec-remove:hover {
   text-decoration: underline;
+}
+
+.status-extras {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e5e5;
+}
+
+.extras-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.extras-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.extras-select {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.extras-apply {
+  padding: 6px 14px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.extras-apply:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
 }
 </style>

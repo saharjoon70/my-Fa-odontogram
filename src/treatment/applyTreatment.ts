@@ -2,7 +2,11 @@
 // پل بین store و odontogram.ts
 
 import { setToothStateAndRender } from "../odontogram";
-import { getRecordsForTooth, addRecord, removeRecord } from "./treatmentStore";
+import {
+  getRecordsForTooth,
+  addRecord,
+  removeRecord,
+} from "./treatmentStore";
 import type {
   StatusRecord,
   TreatmentRecord,
@@ -16,6 +20,7 @@ import {
 } from "./deriveToothState";
 import type { TreatmentItem } from "./treatments";
 import type { StatePatch } from "./statusToState";
+import { STATUS_EXTRAS, type StatusExtra } from "./status_extras";
 
 // ═══════════════════════════════════════════════
 // هسته
@@ -25,9 +30,16 @@ export function recomputeToothState(
   patientId: string,
   toothNo: number,
 ): Record<string, unknown> {
-  const patch = deriveToothPatch(patientId, toothNo);
-  setToothStateAndRender(toothNo, patch);
-  return patch;
+  const neutralPatch = buildNeutralPatch(patientId, toothNo);
+  setToothStateAndRender(toothNo, neutralPatch);
+
+  const records = getRecordsForTooth(patientId, toothNo);
+  if (records.length > 0) {
+    const storedPatch = derivePatchFromRecords(records);
+    setToothStateAndRender(toothNo, storedPatch);
+  }
+
+  return {};
 }
 
 export function previewTreatmentOnTooth(
@@ -36,8 +48,6 @@ export function previewTreatmentOnTooth(
 ): void {
   setToothStateAndRender(toothNo, patch);
 }
-
-// src/treatment/applyTreatment.ts
 
 export function previewTreatmentItem(
   toothNo: number,
@@ -49,6 +59,7 @@ export function previewTreatmentItem(
     setToothStateAndRender(toothNo, patch);
   }
 }
+
 export function applyPatchToTooth(toothNo: number, patch: StatePatch): void {
   setToothStateAndRender(toothNo, patch);
 }
@@ -60,10 +71,10 @@ export function applyPatchToTooth(toothNo: number, patch: StatePatch): void {
 function getStoredToothSelection(patientId: string, toothNo: number): string {
   const records = getRecordsForTooth(patientId, toothNo);
 
-  // آخرین رکورد status که toothSelection را تغییر داده
   const selectionRecords = records
-    .filter((r): r is StatusRecord =>
-      r.kind === "status" && r.itemId === "toothSelection"
+    .filter(
+      (r): r is StatusRecord =>
+        r.kind === "status" && r.itemId === "toothSelection",
     )
     .sort((a, b) => b.createdAt - a.createdAt);
 
@@ -71,21 +82,19 @@ function getStoredToothSelection(patientId: string, toothNo: number): string {
     return String(selectionRecords[0].value);
   }
 
-  // implant
-  const implantRecord = records.find((r) =>
-    r.kind === "treatment" && r.treatmentId === "implant"
+  const implantRecord = records.find(
+    (r) => r.kind === "treatment" && r.treatmentId === "implant",
   );
   if (implantRecord) return "implant";
 
-  // extraction
-  const extractionRecord = records.find((r) =>
-    r.kind === "treatment" && r.treatmentId.startsWith("extraction-")
+  const extractionRecord = records.find(
+    (r) =>
+      r.kind === "treatment" && r.treatmentId.startsWith("extraction-"),
   );
   if (extractionRecord) return "none";
 
-  // denture
-  const dentureRecord = records.find((r) =>
-    r.kind === "treatment" && r.treatmentId.startsWith("denture-")
+  const dentureRecord = records.find(
+    (r) => r.kind === "treatment" && r.treatmentId.startsWith("denture-"),
   );
   if (dentureRecord) return "none";
 
@@ -96,8 +105,9 @@ function getStoredToothSubstrate(patientId: string, toothNo: number): string {
   const records = getRecordsForTooth(patientId, toothNo);
 
   const substrateRecords = records
-    .filter((r): r is StatusRecord =>
-      r.kind === "status" && r.itemId === "toothSubstrate"
+    .filter(
+      (r): r is StatusRecord =>
+        r.kind === "status" && r.itemId === "toothSubstrate",
     )
     .sort((a, b) => b.createdAt - a.createdAt);
 
@@ -105,10 +115,10 @@ function getStoredToothSubstrate(patientId: string, toothNo: number): string {
     return String(substrateRecords[0].value);
   }
 
-  // crown → crownprep
-  const restoRecord = records.find((r) =>
-    r.kind === "treatment" &&
-    (r.treatmentId === "crown" || r.treatmentId === "temporary-crown")
+  const restoRecord = records.find(
+    (r) =>
+      r.kind === "treatment" &&
+      (r.treatmentId === "crown" || r.treatmentId === "temporary-crown"),
   );
   if (restoRecord) return "crownprep";
 
@@ -127,47 +137,35 @@ function buildNeutralPatch(
   const storedSubstrate = getStoredToothSubstrate(patientId, toothNo);
 
   return {
-    // ساختاری — از store
     toothSelection: storedSelection,
     toothSubstrate: storedSubstrate,
-
-    // restoration
     restorationType: "none",
     restorationMaterial: "none",
-    // filling
     fillingMaterial: "none",
-    fillingSurfaces: new Set<string>(),            // ⭐ Set
-    fillingSurfaceMaterials: new Map<string, string>(), // ⭐ Map
-    fillingDefect: new Map<string, string>(),      // ⭐ Map
-    // prosthesis
+    fillingSurfaces: new Set<string>(),
+    fillingSurfaceMaterials: new Map<string, string>(),
+    fillingDefect: new Map<string, string>(),
     prosthesis: "none",
-    // endo
     endo: "none",
     endoResection: false,
     pulpDx: "normal",
     pulpLatin: "none",
-    // apical
     apicalDx: "normal",
     periapicalType: "none",
     resorptionType: "none",
-    // peri-implant
     periImplant: "none",
-    // ortho
     orthoAppliance: "none",
     orthoDrift: "none",
     orthoVertical: "none",
     orthoRotation: false,
-    // perio
     calculus: false,
     fissureSealing: false,
     mobility: "none",
-    mods: new Set<string>(),                        // ⭐ Set
-    // caries
-    caries: new Set<string>(),                      // ⭐ Set
-    cariesSeverity: new Map<string, number>(),      // ⭐ Map
+    mods: new Set<string>(),
+    caries: new Set<string>(),
+    cariesSeverity: new Map<string, number>(),
     rootCaries: "none",
-    radiographicDepth: new Map<string, string>(),   // ⭐ Map
-    // crown
+    radiographicDepth: new Map<string, string>(),
     crownLeakage: false,
     crownReplace: false,
     crownNeeded: false,
@@ -175,19 +173,16 @@ function buildNeutralPatch(
     brokenMesial: false,
     brokenIncisal: false,
     brokenDistal: false,
-    // plan
     extractionPlan: false,
     extractionWound: false,
     missingClosed: false,
-    // wear
     wearEdge: "none",
     wearCervical: "none",
-    // color
     discoloration: "none",
-    // other
     parapulpalPin: false,
     contactMesial: false,
     contactDistal: false,
+    customStates: {},
   };
 }
 
@@ -219,7 +214,7 @@ export function resetToothToStoredState(
 
   const records = getRecordsForTooth(patientId, toothNo);
   if (records.length > 0) {
-    const storedPatch = derivePatchFromRecords(records, toothNo);
+    const storedPatch = derivePatchFromRecords(records);
     setToothStateAndRender(toothNo, storedPatch);
   }
 }
@@ -235,6 +230,24 @@ export function submitStatus(
   itemId: string,
   value: unknown,
 ): StatusRecord {
+  // ⭐ رکوردهای خاص FillingPanel — به‌جای derive، مستقیم اعمال می‌شوند
+if (groupId === "filling" && itemId === "all-surfaces") {
+  const v = value as { surfaces?: string[]; material?: string } | undefined;
+  const surfaces = v?.surfaces ?? [];
+  const material = v?.material ?? "none";
+
+  const materialsMap: Record<string, string> = {};
+  for (const s of surfaces) {
+    materialsMap[s] = material;
+  }
+
+  setToothStateAndRender(toothNo, {
+    fillingMaterial: material,
+    fillingSurfaces: surfaces,
+    fillingSurfaceMaterials: materialsMap,
+  });
+}
+
   const existing = getRecordsForTooth(patientId, toothNo).filter(
     (r): r is StatusRecord =>
       r.kind === "status" && r.groupId === groupId && r.itemId === itemId,
@@ -253,7 +266,12 @@ export function submitStatus(
   };
 
   const rec = addRecord(newRecord) as StatusRecord;
-  recomputeToothState(patientId, toothNo);
+
+  // ⭐ اگر رکورد از نوع FillingPanel نبود، recompute کن
+  if (!(groupId === "filling" && itemId.startsWith("surface-"))) {
+    recomputeToothState(patientId, toothNo);
+  }
+
   return rec;
 }
 
@@ -351,5 +369,74 @@ export function deleteRecord(
   return ok;
 }
 
+// ═══════════════════════════════════════════════
+// پریست‌های وضعیت (Status Extras)
+// ═══════════════════════════════════════════════
+
+export function applyStatusExtraPreset(
+  _patientId: string,
+  extra: StatusExtra,
+): void {
+  if (extra.type === "span") {
+    for (const toothNo of extra.teeth) {
+      setToothStateAndRender(toothNo, {
+        restorationType: "crown",
+        restorationMaterial: extra.material,
+        toothSubstrate: "crownprep",
+        bridgePillar: true,
+      });
+    }
+  } else if (extra.type === "arch-bridge") {
+    const archTeeth =
+      extra.arch === "upper"
+        ? STATUS_EXTRAS.arches.upper
+        : STATUS_EXTRAS.arches.lower;
+    for (const toothNo of archTeeth) {
+      setToothStateAndRender(toothNo, {
+        restorationType: "crown",
+        restorationMaterial: extra.material,
+        toothSubstrate: "crownprep",
+        bridgePillar: true,
+      });
+    }
+  } else if (extra.type === "partial-removable") {
+    const archTeeth =
+      extra.arch === "upper"
+        ? STATUS_EXTRAS.arches.upper
+        : STATUS_EXTRAS.arches.lower;
+    for (const toothNo of archTeeth) {
+      setToothStateAndRender(toothNo, {
+        prosthesis: "removable-partial",
+      });
+    }
+  } else if (extra.type === "full-removable") {
+    const archTeeth =
+      extra.arch === "upper"
+        ? STATUS_EXTRAS.arches.upper
+        : STATUS_EXTRAS.arches.lower;
+    for (const toothNo of archTeeth) {
+      setToothStateAndRender(toothNo, {
+        prosthesis: "removable-full",
+      });
+    }
+  } else if (extra.type === "bar-denture") {
+    for (const toothNo of extra.implants) {
+      setToothStateAndRender(toothNo, {
+        toothSelection: "implant",
+        prosthesis: "bar-denture",
+      });
+    }
+    for (const toothNo of extra.missing) {
+      setToothStateAndRender(toothNo, {
+        toothSelection: "none",
+        prosthesis: "bar-denture",
+      });
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Re-export
+// ═══════════════════════════════════════════════
 export { deriveToothPatch, derivePatchFromRecords, treatmentToPatchPreview };
 export type { OdontogramRecord, StatusRecord, TreatmentRecord, DiagnosisRecord };

@@ -5,9 +5,11 @@ import {
   type StatusGroup,
   type StatusItem,
   type StatusRadio,
+  type StatusSelect,
 } from "./statusGroups";
 import { isItemChecked, getRadioValue } from "./statusToState";
 import { submitStatus, unsubmitStatus } from "./applyTreatment";
+import FillingPanel from "./FillingPanel.vue";
 
 const props = defineProps<{
   patientId: string;
@@ -21,22 +23,17 @@ const emit = defineEmits<{
 
 const activeGroup = ref<StatusGroup>("presence");
 
-// ⭐ گروه‌های مرتبط (برای زیرتب‌ها)
+// ⭐ گروه‌های مرتبط
 const applicableGroups = computed(() => {
   if (!props.toothState) return STATUS_GROUPS;
-
   const filtered = STATUS_GROUPS.filter((g) => {
     if (!g.appliesWhen) return true;
     return g.appliesWhen(props.toothState!);
   });
-
-  // Safety net
   if (filtered.length === 0) return STATUS_GROUPS;
-
   return filtered;
 });
 
-// ⭐ گروه فعال
 const currentGroup = computed(() =>
   applicableGroups.value.find((g) => g.id === activeGroup.value),
 );
@@ -46,7 +43,6 @@ const applicableItems = computed(() => {
   const group = currentGroup.value;
   if (!group?.items) return [];
   if (!props.toothState) return group.items;
-
   return group.items.filter((item) => {
     if (!item.appliesWhen) return true;
     return item.appliesWhen(props.toothState!);
@@ -58,10 +54,20 @@ const applicableRadios = computed(() => {
   const group = currentGroup.value;
   if (!group?.radios) return [];
   if (!props.toothState) return group.radios;
-
   return group.radios.filter((radio) => {
     if (!radio.appliesWhen) return true;
     return radio.appliesWhen(props.toothState!);
+  });
+});
+
+// ⭐ SELECTهای فیلترشده
+const applicableSelects = computed(() => {
+  const group = currentGroup.value;
+  if (!group?.selects) return [];
+  if (!props.toothState) return group.selects;
+  return group.selects.filter((sel) => {
+    if (!sel.appliesWhen) return true;
+    return sel.appliesWhen(props.toothState!);
   });
 });
 
@@ -94,7 +100,6 @@ watch(
   { deep: true },
 );
 
-// ⭐ اطمینان از اینکه activeGroup همیشه معتبر باشد
 watch(applicableGroups, (groups) => {
   if (!groups.find((g) => g.id === activeGroup.value)) {
     activeGroup.value = groups[0]?.id ?? "presence";
@@ -123,9 +128,21 @@ function onRadioChange(group: string, radio: StatusRadio, value: string) {
   emit("change");
 }
 
+function onSelectChange(group: string, select: StatusSelect, value: string) {
+  for (const toothNo of props.toothNos) {
+    submitStatus(props.patientId, toothNo, group, select.field, value);
+  }
+  emit("change");
+}
+
 function getRadio(group: string, radio: StatusRadio): string {
   if (!props.toothState) return "";
   return getRadioValue(radio, props.toothState);
+}
+
+function getSelectValue(field: string): string {
+  if (!props.toothState) return "";
+  return (props.toothState[field] as string) ?? "";
 }
 
 function isChecked(group: string, item: StatusItem): boolean {
@@ -135,7 +152,7 @@ function isChecked(group: string, item: StatusItem): boolean {
 
 <template>
   <div class="status-form" dir="rtl">
-    <!-- زیرتب‌های گروهی — فقط گروه‌های مرتبط -->
+    <!-- زیرتب‌ها -->
     <div class="group-tabs">
       <button
         v-for="g in applicableGroups"
@@ -148,7 +165,7 @@ function isChecked(group: string, item: StatusItem): boolean {
       </button>
     </div>
 
-    <!-- محتوای گروه فعال -->
+    <!-- محتوای گروه -->
     <div v-if="currentGroup" class="group-body">
       <!-- Radio ها -->
       <div v-if="applicableRadios.length" class="radio-section">
@@ -178,8 +195,46 @@ function isChecked(group: string, item: StatusItem): boolean {
         </div>
       </div>
 
-      <!-- Checkbox ها -->
-      <div v-if="applicableItems.length" class="check-list">
+      <!-- ⭐ اگر surfaceCross باشد، FillingPanel را نمایش بده -->
+      <FillingPanel
+        v-if="currentGroup.surfaceCross && props.toothState"
+        :patient-id="patientId"
+        :tooth-nos="toothNos"
+        :tooth-state="props.toothState"
+        @change="emit('change')"
+      />
+
+      <!-- ⭐ Select ها (اگر surfaceCross نیست) -->
+      <div
+        v-if="!currentGroup.surfaceCross && applicableSelects.length"
+        class="select-section"
+      >
+        <label
+          v-for="sel in applicableSelects"
+          :key="sel.field"
+          class="select-row"
+        >
+          <span>{{ sel.label }}</span>
+          <select
+            :value="getSelectValue(sel.field)"
+            @change="onSelectChange(currentGroup.id, sel, ($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="opt in sel.options"
+              :key="opt.value"
+              :value="opt.value"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      <!-- ⭐ Checkbox ها (اگر surfaceCross نیست) -->
+      <div
+        v-if="!currentGroup.surfaceCross && applicableItems.length"
+        class="check-list"
+      >
         <label
           v-for="item in applicableItems"
           :key="item.id"
@@ -197,7 +252,7 @@ function isChecked(group: string, item: StatusItem): boolean {
 
       <!-- پیام خالی -->
       <div
-        v-if="!applicableItems.length && !applicableRadios.length"
+        v-if="!currentGroup.surfaceCross && !applicableItems.length && !applicableRadios.length && !applicableSelects.length"
         class="empty-hint"
       >
         گزینه‌ای برای این دندان وجود ندارد
@@ -309,6 +364,46 @@ function isChecked(group: string, item: StatusItem): boolean {
 
 .radio-option input {
   display: none;
+}
+
+.select-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.select-row > span {
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.select-row select {
+  flex: 1;
+  max-width: 240px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.select-row select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .check-list {

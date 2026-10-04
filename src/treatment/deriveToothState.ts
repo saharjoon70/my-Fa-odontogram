@@ -10,8 +10,9 @@ import type {
 import { getRecordsForTooth } from "./treatmentStore";
 import { statusItemToPatch, statusRadioToPatch } from "./statusToState";
 import type { StatePatch } from "./statusToState";
-import { STATUS_GROUPS } from "./statusGroups";
+import { STATUS_GROUPS, type StatusRadio } from "./statusGroups";
 import type { TreatmentItem } from "./treatments";
+import type { Category } from "./categories";
 
 // ═══════════════════════════════════════════════
 // State پیش‌فرض
@@ -70,10 +71,11 @@ export function defaultToothState(): Record<string, unknown> {
 }
 
 const SHARED_SVG: Record<string, string> = {
-  "scaling-polishing1":      "scaling-polishing1",
+  "scaling-polishing1": "scaling-polishing1",
   "deep-scaling": "scaling-polishing1",
-  "simple-brushing":   "scaling-polishing1",
+  "simple-brushing": "scaling-polishing1",
 };
+
 // ═══════════════════════════════════════════════
 // applyPatch
 // ═══════════════════════════════════════════════
@@ -137,22 +139,22 @@ function applyPatch(
       continue;
     }
 
-    // customStates: { key: value }
- // customStates: { key: value } — activeTreatments را merge کن
-if (key === "customStates" && typeof value === "object" && value !== null) {
-  const cs = { ...(next.customStates as Record<string, unknown> ?? {}) };
-  const incoming = value as Record<string, unknown>;
-  if (Array.isArray(incoming.activeTreatments)) {
-    const existing = Array.isArray(cs.activeTreatments) ? cs.activeTreatments as string[] : [];
-    cs.activeTreatments = Array.from(new Set([...existing, ...(incoming.activeTreatments as string[])]));
-  }
-  for (const [k, v] of Object.entries(incoming)) {
-    if (k === "activeTreatments") continue;
-    cs[k] = v;
-  }
-  next.customStates = cs;
-  continue;
-}
+    // customStates: { key: value } — activeTreatments را merge کن
+    if (key === "customStates" && typeof value === "object" && value !== null) {
+      const cs = { ...(next.customStates as Record<string, unknown> ?? {}) };
+      const incoming = value as Record<string, unknown>;
+      if (Array.isArray(incoming.activeTreatments)) {
+        const existing = Array.isArray(cs.activeTreatments) ? cs.activeTreatments as string[] : [];
+        cs.activeTreatments = Array.from(new Set([...existing, ...(incoming.activeTreatments as string[])]));
+      }
+      for (const [k, v] of Object.entries(incoming)) {
+        if (k === "activeTreatments") continue;
+        cs[k] = v;
+      }
+      next.customStates = cs;
+      continue;
+    }
+
     // بقیه
     next[key] = value;
   }
@@ -168,12 +170,11 @@ export function deriveToothPatch(
   toothNo: number,
 ): Record<string, unknown> {
   const records = getRecordsForTooth(patientId, toothNo);
-  return derivePatchFromRecords(records, toothNo);
+  return derivePatchFromRecords(records);
 }
 
 export function derivePatchFromRecords(
   records: OdontogramRecord[],
-  toothNo: number,
 ): Record<string, unknown> {
   let state: Record<string, unknown> = {};
   let hasAnyRecord = false;
@@ -191,9 +192,29 @@ export function derivePatchFromRecords(
   }
 
   for (const rec of latestStatus.values()) {
+    // ⭐ رکوردهای خاص FillingPanel (surface-{id})
+// ⭐ رکوردهای خاص FillingPanel (all-surfaces)
+if (rec.groupId === "filling" && rec.itemId === "all-surfaces") {
+  const value = rec.value as { surfaces?: string[]; material?: string } | undefined;
+  const surfaces = value?.surfaces ?? [];
+  const material = value?.material ?? "none";
+
+  const materialsMap: Record<string, string> = {};
+  for (const s of surfaces) {
+    materialsMap[s] = material;
+  }
+
+  state.fillingMaterial = material;
+  state.fillingSurfaces = surfaces;
+  state.fillingSurfaceMaterials = materialsMap;
+  hasAnyRecord = true;
+  continue;
+}
+
     const group = STATUS_GROUPS.find((g) => g.id === rec.groupId);
     if (!group) continue;
 
+    // ⭐ چک کن items (checkbox)
     const item = group.items.find((i) => i.id === rec.itemId);
     if (item) {
       const checked =
@@ -208,9 +229,13 @@ export function derivePatchFromRecords(
       continue;
     }
 
+    // ⭐ چک کن radios یا selects
     const radio = group.radios?.find((r) => r.field === rec.itemId);
-    if (radio && typeof rec.value === "string") {
-      const patch = statusRadioToPatch(radio, rec.value);
+    const select = group.selects?.find((s) => s.field === rec.itemId);
+    const fieldDef = radio || select;
+
+    if (fieldDef && typeof rec.value === "string") {
+      const patch = statusRadioToPatch(fieldDef as StatusRadio, rec.value);
       if (patch) {
         state = applyPatch(state, patch);
         hasAnyRecord = true;
@@ -252,15 +277,13 @@ export function deriveToothState(
 
 export function deriveFromRecords(
   records: OdontogramRecord[],
-  toothNo: number,
 ): Record<string, unknown> {
-  const patch = derivePatchFromRecords(records, toothNo);
+  const patch = derivePatchFromRecords(records);
   return { ...defaultToothState(), ...patch };
 }
 
 // ═══════════════════════════════════════════════
-// treatmentToPatchPreview — برای پیش‌نمایش
-// ⭐ با پشتیبانی از چند سطح (surfaces: string[])
+// treatmentToPatchPreview
 // ═══════════════════════════════════════════════
 export function treatmentToPatchPreview(
   item: TreatmentItem,
@@ -271,7 +294,6 @@ export function treatmentToPatchPreview(
   const surfaces = options.surfaces ?? [];
   const material = options.material;
 
-  // ⭐ برای دندان‌های قدامی، "incisal" → "occlusal" (چون SVG فقط occlusal دارد)
   const svgSurfaces = surfaces.map((s) => (s === "incisal" ? "occlusal" : s));
 
   // ═══ ترمیمی ═══
@@ -282,7 +304,6 @@ export function treatmentToPatchPreview(
       : "composite";
     patch.fillingMaterial = mat;
     if (svgSurfaces.length > 0) {
-      // ⭐ چند سطح
       const materialsMap: Record<string, string> = {};
       for (const s of svgSurfaces) {
         materialsMap[s] = mat;
@@ -418,15 +439,6 @@ export function treatmentToPatchPreview(
     patch.orthoRotation = true;
   }
 
-  // ═══ پریو ═══
-  // else if (id === "laser-gum-therapy") {
-  //   patch.calculus = true;
-  //   patch.mods = { toggle: "parodontal", on: true };
-  // } else if (id === "gingival-graft"   || id === "gum-contouring" ||
-  //            id === "gum-aesthetics") {
-  //   patch.mods = { toggle: "parodontal", on: true };
-  // }
-
   // ═══ زیبایی ═══
   else if (id === "bleaching-office" || id === "bleaching-home" ||
            id === "bleaching-internal" || id === "temporary-whitening") {
@@ -466,63 +478,65 @@ export function treatmentToPatchPreview(
   } else if (id === "fissure-sealing") {
     patch.fissureSealing = true;
   }
-// ⭐ سرویس‌های با SVG سفارشی
-const CUSTOM_SVG_TREATMENTS = [
-  "sinus-lift",
-  "bone-graft",
-  "night-guard",
-  "scaling-polishing1",
-  "tmj-treatment",
-  "gingival-graft1",
-  "prosthesis-repair",
-  "smile-design",
-  "curettage1",
-  "dsd",
-  "root-planing",
-  "flap-surgery",
-  "keratinized-gum-graft",
-  "frenectomy-perio",
-  "gingivectomy",
-  "microabrasion",
-  "fluoride-therapy",
-  "biopsy",
-  "periodontitis-treatment",
-  "laser-gum-therapy",
-  "gum-contouring",
-  "cosmetic-polishing",
-  "bite-plate"
-  // هر سرویس دیگری که SVG سفارشی دارد
-];
 
-if (CUSTOM_SVG_TREATMENTS.includes(id)) {
-  patch.customStates = {
-    ...(patch.customStates as Record<string, unknown> ?? {}),
-    activeTreatments: [id],
-  };
-}
-// ⭐ سرویس‌هایی که SVG مشترک دارند
-const sharedId = SHARED_SVG[id];
-if (sharedId) {
-  patch.customStates = {
-    ...(patch.customStates as Record<string, unknown> ?? {}),
-    activeTreatments: [sharedId],
-  };
-}
+  // ⭐ سرویس‌های با SVG سفارشی
+  const CUSTOM_SVG_TREATMENTS = [
+    "sinus-lift",
+    "bone-graft",
+    "night-guard",
+    "scaling-polishing1",
+    "tmj-treatment",
+    "gingival-graft1",
+    "prosthesis-repair",
+    "smile-design",
+    "curettage1",
+    "dsd",
+    "root-planing",
+    "flap-surgery",
+    "keratinized-gum-graft",
+    "frenectomy-perio",
+    "gingivectomy",
+    "microabrasion",
+    "fluoride-therapy",
+    "biopsy",
+    "periodontitis-treatment",
+    "laser-gum-therapy",
+    "gum-contouring",
+    "cosmetic-polishing",
+    "bite-plate",
+  ];
+
+  if (CUSTOM_SVG_TREATMENTS.includes(id)) {
+    patch.customStates = {
+      ...(patch.customStates as Record<string, unknown> ?? {}),
+      activeTreatments: [id],
+    };
+  }
+
+  // ⭐ سرویس‌هایی که SVG مشترک دارند
+  const sharedId = SHARED_SVG[id];
+  if (sharedId) {
+    patch.customStates = {
+      ...(patch.customStates as Record<string, unknown> ?? {}),
+      activeTreatments: [sharedId],
+    };
+  }
+
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
 // ═══════════════════════════════════════════════
-// treatmentRecordToPatch — برای derive
+// treatmentRecordToPatch
 // ═══════════════════════════════════════════════
 function treatmentRecordToPatch(rec: TreatmentRecord): StatePatch | null {
   const fakeItem: TreatmentItem = {
     id: rec.treatmentId,
     label: rec.treatmentLabel,
-    category: rec.category as any,
+    category: rec.category as Category,
     icon: "",
   };
   return treatmentToPatchPreview(fakeItem, {
-    surfaces: rec.surfaces,
+    surfaces: rec.surface ? [rec.surface] : [],
     material: rec.material,
   });
 }
@@ -564,7 +578,8 @@ export function getRecordLabel(rec: OdontogramRecord): string {
     const group = STATUS_GROUPS.find((g) => g.id === rec.groupId);
     const item = group?.items.find((i) => i.id === rec.itemId);
     const radio = group?.radios?.find((r) => r.field === rec.itemId);
-    return item?.label ?? radio?.label ?? rec.itemId;
+    const select = group?.selects?.find((s) => s.field === rec.itemId);
+    return item?.label ?? radio?.label ?? select?.label ?? rec.itemId;
   }
   return "—";
 }

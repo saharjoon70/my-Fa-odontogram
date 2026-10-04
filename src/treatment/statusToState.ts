@@ -80,75 +80,58 @@ export function statusItemToPatch(
   const field = item.field;
   const value = item.value;
 
-  // ─── فیلدهای ساده boolean ───
-  if (isBooleanField(field)) {
-    return { [field]: checked };
-  }
+  // ═══ فیلدهای ویژه ═══
 
-  // ─── toothSelection (enum) ───
-  if (field === "toothSelection") {
-    if (checked) return { toothSelection: value as string };
-    // اگر uncheck شد و مقدار فعلی همان value بود، به tooth-base برگردان
-    return { toothSelection: "tooth-base" };
-  }
-
-  // ─── restorationType (enum) ───
-  if (field === "restorationType") {
-    if (checked) return { restorationType: value as string };
-    return { restorationType: "none", restorationMaterial: "none" };
-  }
-
-  // ─── restorationMaterial / prosthesis / wear / discoloration / ortho (enum) ───
-  if (isEnumField(field)) {
-    if (checked) return { [field]: value };
-    // برای enum، uncheck = "none" مگر در حالت‌های خاص
-    return { [field]: "none" };
-  }
-
-  // ─── caries (Set<string>) ───
+  // caries (Set)
   if (field === "caries") {
-    // value رشته‌ای مثل "caries-mesial"
     return { caries: { toggle: value as string, on: checked } };
   }
 
-  // ─── fillingSurfaceMaterials (Map<string,string>) ───
-if (field === "fillingSurfaceMaterials") {
-  const obj = value as { material?: string } | undefined;
-  const mat = obj?.material ?? "composite";
-  return { fillingMaterial: mat };
-}
-
-  // ─── fillingDefect (Map) ───
-if (field === "fillingDefect") {
-  const obj = value as { defect?: string } | undefined;
-  const defect = obj?.defect ?? "marginal";
-  return { fillingDefectAll: defect, fillingDefectOn: checked };
-}
-
-  // ─── rootCaries (enum) ───
-  if (field === "rootCaries") {
-    if (checked) return { rootCaries: value as string };
-    return { rootCaries: "none" };
-  }
-
-  // ─── crownLeakage / crownReplace / ... (boolean) ───
-  if (isBooleanField(field)) {
-    return { [field]: checked };
-  }
-
-  // ─── customStates.* (فیلدهای بالینی بدون SVG) ───
-  if (field.startsWith("customStates.")) {
-    const key = field.replace("customStates.", "");
-    return { customStates: { [key]: checked ? value ?? true : false } };
-  }
-
-  // ─── mods (Set<string>) ───
+  // mods (Set)
   if (field === "mods") {
     return { mods: { toggle: value as string, on: checked } };
   }
 
-  console.warn("[statusToState] unhandled field:", field);
-  return null;
+  // customStates.*
+  if (field.startsWith("customStates.")) {
+    const key = field.replace("customStates.", "");
+    return { customStates: { [key]: checked ? (value ?? true) : false } };
+  }
+
+  // fillingSurfaceMaterials (Map)
+  if (field === "fillingSurfaceMaterials") {
+    const obj = value as { material?: string } | undefined;
+    const mat = obj?.material ?? "composite";
+    if (checked) {
+      return { fillingMaterial: mat };
+    }
+    return { fillingMaterial: "none" };
+  }
+
+  // fillingDefect (Map)
+  if (field === "fillingDefect") {
+    const obj = value as { defect?: string } | undefined;
+    const defect = obj?.defect ?? "marginal";
+    return { fillingDefectAll: defect, fillingDefectOn: checked };
+  }
+
+  // ═══ همه‌ی فیلدهای boolean ═══
+  // (اگر value ندارند، یا value غیر از رشته/آبجکت است)
+  if (!value || typeof value === "boolean") {
+    return { [field]: checked };
+  }
+
+  // ═══ فیلدهای enum (با value) ═══
+  if (typeof value === "string") {
+    if (checked) {
+      return { [field]: value };
+    }
+    // uncheck → none
+    return { [field]: "none" };
+  }
+
+  // ═══ fallback: فقط boolean ═══
+  return { [field]: checked };
 }
 
 /**
@@ -160,31 +143,17 @@ export function statusRadioToPatch(
 ): StatePatch | null {
   const field = radio.field;
 
-  // ─── pulpDx + endo (radio ترکیبی) ───
+  // ═══ فیلدهای ویژه ═══
+
+  // pulpDx + endo
   if (field === "pulpDx") {
-    // اگر مقدار از گروه endo باشد
     if (value.startsWith("endo-")) {
       return { endo: value, pulpDx: "normal", pulpLatin: "none" };
     }
     return { pulpDx: value, endo: "none" };
   }
 
-  // ─── apicalDx (enum) ───
-  if (field === "apicalDx") {
-    return { apicalDx: value };
-  }
-
-  // ─── periapicalType (enum) ───
-  if (field === "periapicalType") {
-    return { periapicalType: value };
-  }
-
-  // ─── mobility (enum) ───
-  if (field === "mobility") {
-    return { mobility: value };
-  }
-
-  // ─── cariesSeverityUI (سه‌سطحی → ICDAS) ───
+  // cariesSeverityUI (سه‌سطحی → ICDAS)
   if (field === "cariesSeverityUI") {
     const icdasMap: Record<string, number> = {
       mild: 2,
@@ -194,17 +163,9 @@ export function statusRadioToPatch(
     return { cariesSeverityUI: value, cariesSeverityAll: icdasMap[value] ?? 2 };
   }
 
-  if (isEnumField(field)) {
-    return { [field]: value };
-  }
-if (field === "toothSelection") {
-  return { toothSelection: value };
-}
-if (field === "toothSubstrate") {
-  return { toothSubstrate: value };
-}
-  console.warn("[statusToState] unhandled radio field:", field);
-  return null;
+  // ═══ همه‌ی فیلدهای enum دیگر ═══
+  // این‌ها همه یک شکل هستند: { field: value }
+  return { [field]: value };
 }
 
 /**
