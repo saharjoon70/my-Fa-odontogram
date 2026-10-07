@@ -4,9 +4,12 @@
 import { setToothStateAndRender } from "../odontogram";
 import {
   getRecordsForTooth,
+  getRecordsForPatient,   // ⭐ اضافه شد
   addRecord,
   removeRecord,
 } from "./treatmentStore";
+
+
 import type {
   StatusRecord,
   TreatmentRecord,
@@ -303,8 +306,14 @@ export function submitTreatment(
     surface?: string;
     material?: string;
     price: number;
-    status: "done" | "planned";
+    status: "done" | "planned" | "cancelled";
     note?: string;
+    // ⭐ جدید
+    planId?: string;
+    sessionId?: string;
+    doctorId?: string;
+    assistantId?: string;
+    time?: string;
   },
 ): TreatmentRecord {
   const newRecord: Omit<TreatmentRecord, "id" | "createdAt"> = {
@@ -320,6 +329,12 @@ export function submitTreatment(
     material: treatment.material,
     price: treatment.price,
     status: treatment.status,
+    // ⭐ جدید
+    planId: treatment.planId,
+    sessionId: treatment.sessionId,
+    doctorId: treatment.doctorId,
+    assistantId: treatment.assistantId,
+    time: treatment.time,
   };
 
   const rec = addRecord(newRecord) as TreatmentRecord;
@@ -435,6 +450,83 @@ export function applyStatusExtraPreset(
   }
 }
 
+
+// ═══════════════════════════════════════════════
+// توابع جدید برای Plan/Session
+// ═══════════════════════════════════════════════
+
+/** گرفتن همه‌ی طرح‌های درمانی (planned) یک بیمار */
+export function getPlannedRecordsForPatient(
+  patientId: string,
+): OdontogramRecord[] {
+  return getRecordsForPatient(patientId)
+    .filter((r): r is TreatmentRecord | DiagnosisRecord => {
+      return (
+        (r.kind === "treatment" || r.kind === "diagnosis") &&
+        r.status === "planned"
+      );
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** گرفتن درمان‌های یک جلسه */
+export function getRecordsForSession(
+  patientId: string,
+  sessionId: string,
+): OdontogramRecord[] {
+  return getRecordsForPatient(patientId).filter((r) => {
+    if (r.kind === "treatment" || r.kind === "diagnosis") {
+      return r.sessionId === sessionId;
+    }
+    return false;
+  });
+}
+
+/** گرفتن درمان‌های یک طرح */
+export function getRecordsForPlan(
+  patientId: string,
+  planId: string,
+): OdontogramRecord[] {
+  return getRecordsForPatient(patientId).filter((r) => {
+    if (r.kind === "treatment" || r.kind === "diagnosis") {
+      return r.planId === planId;
+    }
+    return false;
+  });
+}
+
+/** تبدیل یک طرح به انجام‌شده */
+export function markAsDone(
+  patientId: string,
+  toothNo: number,
+  recordId: string,
+): boolean {
+  const records = getRecordsForTooth(patientId, toothNo);
+  const rec = records.find((r) => r.id === recordId);
+  if (!rec) return false;
+  if (rec.kind !== "treatment" && rec.kind !== "diagnosis") return false;
+
+  rec.status = "done";
+  rec.date = new Date().toISOString().slice(0, 10);
+  recomputeToothState(patientId, toothNo);
+  return true;
+}
+
+/** برگرداندن به طرح */
+export function markAsPlanned(
+  patientId: string,
+  toothNo: number,
+  recordId: string,
+): boolean {
+  const records = getRecordsForTooth(patientId, toothNo);
+  const rec = records.find((r) => r.id === recordId);
+  if (!rec) return false;
+  if (rec.kind !== "treatment" && rec.kind !== "diagnosis") return false;
+
+  rec.status = "planned";
+  recomputeToothState(patientId, toothNo);
+  return true;
+}
 // ═══════════════════════════════════════════════
 // Re-export
 // ═══════════════════════════════════════════════

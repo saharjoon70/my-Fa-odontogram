@@ -17,6 +17,15 @@ import {
   previewTreatmentItem,
   resetToothToStoredState,
 } from "./applyTreatment";
+import {
+  getPlansForPatient,
+  getSessionsForPlan,
+  getDoctors,
+  getAssistants,
+  getNextSessionNumber,
+} from "./treatmentPlanStore";
+import StaffSelector from "./StaffSelector.vue";
+import DatePicker from "./DatePicker.vue";
 
 const props = defineProps<{
   patientId: string;
@@ -28,28 +37,48 @@ const emit = defineEmits<{
     treatmentId: string;
     treatmentLabel: string;
     category: string;
-    surfaces?: string[];   // ⭐ آرایه
+    surfaces?: string[];
     material?: string;
     price: number;
     status: "done" | "planned";
     note: string;
+    planId?: string;
+    sessionId?: string;
+    doctorId?: string;
+    assistantId?: string;
+    date: string;
+    time: string;
   }];
-  cancel: [];
 }>();
 
-const activeCategory = ref<string>(TREATMENT_TAB_CATEGORIES[0]?.id ?? "exam");
+// ═══ Mode: درمان (انجام‌شده) یا طرح درمان ═══
+const mode = ref<"done" | "planned">("done");
+
+// ═══ Service ═══
+const activeCategory = ref<string>(TREATMENT_TAB_CATEGORIES[0]?.id ?? "restorative");
 const selected = ref<TreatmentItem | null>(null);
-const surfaces = ref<string[]>([]);   // ⭐ آرایه به‌جای رشته
+const surfaces = ref<string[]>([]);
 const material = ref("");
 const price = ref(0);
-const status = ref<"done" | "planned">("done");
 const note = ref("");
 
+// ═══ Schedule ═══
+const date = ref(new Date().toISOString().slice(0, 10));
+const time = ref(new Date().toTimeString().slice(0, 5));
+
+// ═══ Plan / Session ═══
+const planId = ref("");
+const sessionId = ref("");
+
+// ═══ Team ═══
+const doctorId = ref("");
+const assistantId = ref("");
+
+// ═══ Computed ═══
 const activeToothNo = computed(() =>
   props.toothNos.length > 0 ? props.toothNos[0] : null,
 );
 
-// سطوح با label پویا بر اساس دندان
 const surfaceOptions = computed(() =>
   SURFACES.map((s) => ({
     id: s.id,
@@ -63,6 +92,12 @@ const filteredTreatments = computed(() =>
   getTreatmentsByCategory(activeCategory.value as any),
 );
 
+const allPlans = computed(() => getPlansForPatient(props.patientId));
+
+const availableSessions = computed(() =>
+  planId.value ? getSessionsForPlan(planId.value) : [],
+);
+
 const canSubmit = computed(() => {
   if (!selected.value) return false;
   if (selected.value.needsSurface && surfaces.value.length === 0) return false;
@@ -70,15 +105,12 @@ const canSubmit = computed(() => {
   return true;
 });
 
+// ═══ Preview ═══
 function refreshPreview() {
   if (props.toothNos.length === 0) return;
-
-  // مرحله ۱: پاک کردن preview قبلی
   for (const toothNo of props.toothNos) {
     resetToothToStoredState(props.patientId, toothNo);
   }
-
-  // مرحله ۲: اعمال preview جدید
   if (!selected.value) return;
   for (const toothNo of props.toothNos) {
     previewTreatmentItem(toothNo, selected.value, {
@@ -88,6 +120,35 @@ function refreshPreview() {
   }
 }
 
+// ═══ Watch: preview on change ═══
+watch([selected, surfaces, material], refreshPreview, { deep: true });
+
+watch(
+  () => [...props.toothNos],
+  () => refreshPreview(),
+  { immediate: true },
+);
+
+// ═══ Watch: plan change → reset session ═══
+watch(planId, () => {
+  sessionId.value = "";
+});
+
+// ═══ Init team defaults ═══
+function initTeamDefaults() {
+  const doctors = getDoctors();
+  const assistants = getAssistants();
+  if (!doctorId.value && doctors.length > 0) {
+    doctorId.value = doctors[0].id;
+  }
+  if (!assistantId.value && assistants.length > 0) {
+    assistantId.value = assistants[0].id;
+  }
+}
+
+initTeamDefaults();
+
+// ═══ Actions ═══
 function selectTreatment(item: TreatmentItem) {
   if (selected.value?.id === item.id) {
     selected.value = null;
@@ -97,35 +158,19 @@ function selectTreatment(item: TreatmentItem) {
     refreshPreview();
     return;
   }
-
   selected.value = item;
   price.value = item.defaultPrice ?? 0;
   surfaces.value = [];
   material.value = "";
-
   refreshPreview();
 }
 
-// ⭐ toggle سطح (چند انتخابی)
 function toggleSurface(surfaceId: string) {
   const idx = surfaces.value.indexOf(surfaceId);
-  if (idx >= 0) {
-    surfaces.value = surfaces.value.filter((s) => s !== surfaceId);
-  } else {
-    surfaces.value = [...surfaces.value, surfaceId];
-  }
+  if (idx >= 0) surfaces.value = surfaces.value.filter((s) => s !== surfaceId);
+  else surfaces.value = [...surfaces.value, surfaceId];
   refreshPreview();
 }
-
-watch(material, () => {
-  if (selected.value) refreshPreview();
-});
-
-watch(
-  () => [...props.toothNos],
-  () => refreshPreview(),
-  { immediate: true },
-);
 
 function onSubmit() {
   if (!canSubmit.value || !selected.value) return;
@@ -136,16 +181,23 @@ function onSubmit() {
     surfaces: surfaces.value.length > 0 ? [...surfaces.value] : undefined,
     material: material.value || undefined,
     price: price.value,
-    status: status.value,
+    status: mode.value,
     note: note.value,
+    planId: planId.value || undefined,
+    sessionId: sessionId.value || undefined,
+    doctorId: doctorId.value || undefined,
+    assistantId: assistantId.value || undefined,
+    date: date.value,
+    time: time.value,
   });
 
+  // Reset form
   selected.value = null;
   surfaces.value = [];
   material.value = "";
   price.value = 0;
-  status.value = "done";
   note.value = "";
+  // تاریخ/ساعت رو نگه می‌داریم (احتمالاً چند تا درمان پشت سر هم)
 }
 
 function onCancel() {
@@ -161,21 +213,44 @@ function onCancel() {
 </script>
 
 <template>
-  <div class="treatment-form" dir="rtl">
+  <div
+    class="treatment-form"
+    dir="rtl"
+  >
+    <!-- ═══ Mode Selector ═══ -->
+    <div class="mode-selector">
+      <button
+        :class="['mode-btn', { active: mode === 'done' }]"
+        @click="mode = 'done'"
+      >
+        <span class="mode-icon">✅</span>
+        <span class="mode-text">
+          <strong>ثبت درمان</strong>
+          <small>انجام‌شده در همین جلسه</small>
+        </span>
+      </button>
+      <button
+        :class="['mode-btn', { active: mode === 'planned' }]"
+        @click="mode = 'planned'"
+      >
+        <span class="mode-icon">📋</span>
+        <span class="mode-text">
+          <strong>طرح درمان</strong>
+          <small>برنامه‌ریزی برای آینده</small>
+        </span>
+      </button>
+    </div>
+
+    <!-- ═══ Header ═══ -->
     <div class="form-header">
       <div class="header-title">
-        <span v-if="toothNos.length === 0">
-          ابتدا یک دندان انتخاب کنید
-        </span>
-        <span v-else-if="toothNos.length === 1">
-          ثبت درمان — دندان {{ toothNos[0] }}
-        </span>
-        <span v-else>
-          ثبت درمان — {{ toothNos.length }} دندان ({{ toothNos.join(", ") }})
-        </span>
+        <span v-if="toothNos.length === 0">ابتدا یک دندان انتخاب کنید</span>
+        <span v-else-if="toothNos.length === 1">دندان {{ toothNos[0] }}</span>
+        <span v-else>{{ toothNos.length }} دندان ({{ toothNos.join(", ") }})</span>
       </div>
     </div>
 
+    <!-- ═══ Categories ═══ -->
     <div class="category-tabs">
       <button
         v-for="cat in TREATMENT_TAB_CATEGORIES"
@@ -188,6 +263,7 @@ function onCancel() {
       </button>
     </div>
 
+    <!-- ═══ Services Grid ═══ -->
     <div class="treatments-grid">
       <button
         v-for="item in filteredTreatments"
@@ -196,24 +272,26 @@ function onCancel() {
         :title="item.label"
         @click="selectTreatment(item)"
       >
-        <div class="treatment-icon" v-html="getTreatmentIcon(item.icon)"></div>
+        <div
+          class="treatment-icon"
+          v-html="getTreatmentIcon(item.icon)"
+        ></div>
         <span class="treatment-label">{{ item.label }}</span>
       </button>
     </div>
 
-    <div v-if="selected" class="treatment-details">
+    <!-- ═══ Details (when service selected) ═══ -->
+    <div
+      v-if="selected"
+      class="treatment-details"
+    >
       <h4>جزئیات: {{ selected.label }}</h4>
 
-      <div class="detail-preview">
-        <div class="detail-icon" v-html="getTreatmentIcon(selected.icon)"></div>
-        <div class="detail-info">
-          <div class="detail-category">{{ getCategoryLabel(selected.category) }}</div>
-          <div class="detail-name">{{ selected.label }}</div>
-        </div>
-      </div>
-
-      <!-- ⭐ سطح — چند انتخابی با surface-cross -->
-      <div v-if="selected.needsSurface" class="surface-picker">
+      <!-- Surface -->
+      <div
+        v-if="selected.needsSurface"
+        class="surface-picker"
+      >
         <div class="surface-label">سطح</div>
         <div class="surface-cross">
           <button
@@ -229,42 +307,112 @@ function onCancel() {
         </div>
       </div>
 
-      <label v-if="selected.needsMaterial" class="detail-row">
+      <!-- Material -->
+      <div
+        v-if="selected.needsMaterial"
+        class="detail-row"
+      >
         <span>جنس</span>
         <select v-model="material">
           <option value="">— انتخاب —</option>
-          <option v-for="m in MATERIALS" :key="m.id" :value="m.id">
+          <option
+            v-for="m in MATERIALS"
+            :key="m.id"
+            :value="m.id"
+          >
             {{ m.label }}
           </option>
         </select>
-      </label>
-
-      <label class="detail-row">
-        <span>قیمت (تومان)</span>
-        <input v-model.number="price" type="number" min="0" step="50000" />
-      </label>
-
-      <label class="detail-row">
-        <span>وضعیت</span>
-        <select v-model="status">
-          <option value="done">انجام شد</option>
-          <option value="planned">طرح درمان</option>
-        </select>
-      </label>
-
-      <label class="detail-row detail-row-full">
-        <span>یادداشت</span>
-        <textarea v-model="note" rows="2" placeholder="اختیاری..."></textarea>
-      </label>
-
-      <div class="form-actions">
-        <button class="btn-primary" :disabled="!canSubmit" @click="onSubmit">
-          ثبت درمان
-        </button>
-        <button class="btn-secondary" @click="onCancel">انصراف</button>
       </div>
 
-      <div v-if="!canSubmit" class="hint">
+      <!-- ═══ Schedule ═══ -->
+      <div class="section-title">📅 زمان‌بندی</div>
+      <DatePicker
+        v-model:date="date"
+        v-model:time="time"
+      />
+
+      <!-- ═══ Plan / Session ═══ -->
+      <div class="section-title">📋 طرح درمان</div>
+      <div class="detail-row">
+        <span>طرح:</span>
+        <select v-model="planId">
+          <option value="">— بدون طرح (مستقل) —</option>
+          <option
+            v-for="plan in allPlans"
+            :key="plan.id"
+            :value="plan.id"
+          >
+            {{ plan.title }}
+          </option>
+        </select>
+      </div>
+
+      <div
+        v-if="planId"
+        class="detail-row"
+      >
+        <span>جلسه:</span>
+        <select v-model="sessionId">
+          <option value="">— بدون جلسه —</option>
+          <option
+            v-for="sess in availableSessions"
+            :key="sess.id"
+            :value="sess.id"
+          >
+            جلسه {{ sess.sessionNumber }} — {{ sess.title }}
+          </option>
+        </select>
+      </div>
+
+      <!-- ═══ Team (collapsible) ═══ -->
+      <div class="section-title">👥 تیم درمان</div>
+      <StaffSelector
+        v-model:doctor-id="doctorId"
+        v-model:assistant-id="assistantId"
+      />
+
+      <!-- ═══ Price & Note ═══ -->
+      <div class="detail-row">
+        <span>قیمت (تومان)</span>
+        <input
+          v-model.number="price"
+          type="number"
+          min="0"
+          step="50000"
+        />
+      </div>
+
+      <div class="detail-row detail-row-full">
+        <span>یادداشت</span>
+        <textarea
+          v-model="note"
+          rows="2"
+          placeholder="اختیاری..."
+        ></textarea>
+      </div>
+
+      <!-- Actions -->
+      <div class="form-actions">
+        <button
+          class="btn-primary"
+          :disabled="!canSubmit"
+          @click="onSubmit"
+        >
+          {{ mode === "done" ? "✅ ثبت درمان" : "📋 ثبت طرح درمان" }}
+        </button>
+        <button
+          class="btn-secondary"
+          @click="onCancel"
+        >
+          انصراف
+        </button>
+      </div>
+
+      <div
+        v-if="!canSubmit"
+        class="hint"
+      >
         <span v-if="selected.needsSurface && surfaces.length === 0">
           ⚠️ حداقل یک سطح انتخاب کنید
         </span>
@@ -274,26 +422,91 @@ function onCancel() {
       </div>
     </div>
 
-    <div v-else class="empty-hint">
+    <div
+      v-else
+      class="empty-hint"
+    >
       👆 یک سرویس از بالا انتخاب کنید
     </div>
   </div>
 </template>
 
 <style scoped>
+/* کپی از نسخه‌ی قبلی TreatmentForm + اضافه‌ها */
+
 .treatment-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+/* ⭐ Mode selector */
+.mode-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 2px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  text-align: right;
+}
+
+.mode-btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.mode-btn.active {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+}
+
+.mode-btn.active[data-mode="planned"] {
+  border-color: #f59e0b;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.12);
+}
+
+.mode-icon {
+  font-size: 22px;
+}
+
+.mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-text strong {
+  font-size: 12px;
+  color: #111827;
+}
+
+.mode-text small {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+/* بقیه استایل‌ها — از نسخه‌ی قبلی */
 .form-header {
   padding-bottom: 8px;
   border-bottom: 1px solid #eee;
 }
 
 .header-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #333;
 }
@@ -307,13 +520,13 @@ function onCancel() {
 }
 
 .cat-tab {
-  padding: 6px 12px;
+  padding: 5px 10px;
   border: 1px solid #e5e5e5;
   background: #f9f9f9;
   border-radius: 6px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
   transition: all 0.15s;
 }
@@ -330,7 +543,7 @@ function onCancel() {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
   gap: 6px;
-  max-height: 320px;
+  max-height: 280px;
   overflow-y: auto;
   padding: 4px;
   background: #fafafa;
@@ -354,7 +567,6 @@ function onCancel() {
 .treatment-btn:hover {
   border-color: #93c5fd;
   background: #f0f9ff;
-  transform: translateY(-1px);
 }
 
 .treatment-btn.active {
@@ -400,45 +612,81 @@ function onCancel() {
   color: #1f2937;
 }
 
-.detail-preview {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e5e5e5;
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
 }
 
-.detail-icon {
-  color: #2563eb;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.detail-icon :deep(svg) {
-  width: 36px;
-  height: 36px;
-}
-
-.detail-info {
+.surface-picker {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.surface-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.surface-cross {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  grid-template-areas:
+    ". buccal ."
+    "mesial occlusal distal"
+    ". lingual .";
+  gap: 6px;
+  max-width: 300px;
+}
+
+.surface-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
+  padding: 8px 4px;
+  border: 1.5px solid #e5e5e5;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  min-height: 50px;
 }
 
-.detail-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #111;
+.surface-cell:hover {
+  border-color: #93c5fd;
+  background: #f0f9ff;
 }
 
-.detail-category {
-  font-size: 11px;
-  color: #6b7280;
+.surface-cell.active {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.surface-cell.pos-buccal { grid-area: buccal; }
+.surface-cell.pos-mesial { grid-area: mesial; }
+.surface-cell.pos-occlusal { grid-area: occlusal; }
+.surface-cell.pos-distal { grid-area: distal; }
+.surface-cell.pos-lingual { grid-area: lingual; }
+
+.surf-letter {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.surf-name {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .detail-row {
@@ -485,7 +733,6 @@ function onCancel() {
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
-  transition: background 0.15s;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -524,74 +771,5 @@ function onCancel() {
   color: #999;
   padding: 30px 20px;
   font-size: 13px;
-}
-
-.surface-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.surface-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #374151;
-}
-
-.surface-cross {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: auto auto auto;
-  grid-template-areas:
-    ". buccal ."
-    "mesial occlusal distal"
-    ". lingual .";
-  gap: 6px;
-  max-width: 320px;
-}
-
-.surface-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 8px 4px;
-  border: 1.5px solid #e5e5e5;
-  background: #fff;
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-  min-height: 50px;
-}
-
-.surface-cell:hover {
-  border-color: #93c5fd;
-  background: #f0f9ff;
-}
-
-.surface-cell.active {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: #fff;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-}
-
-.surface-cell.pos-buccal   { grid-area: buccal; }
-.surface-cell.pos-mesial   { grid-area: mesial; }
-.surface-cell.pos-occlusal { grid-area: occlusal; }
-.surface-cell.pos-distal   { grid-area: distal; }
-.surface-cell.pos-lingual  { grid-area: lingual; }
-
-.surf-letter {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.surf-name {
-  font-size: 10px;
-  line-height: 1;
 }
 </style>

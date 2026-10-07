@@ -31,7 +31,13 @@ export interface TreatmentRecord extends BaseRecord {
   surface?: string;
   material?: string;
   price: number;
-  status: "done" | "planned";
+  status: "done" | "planned" | "cancelled";
+  // ⭐ فیلدهای جدید — همه optional
+  planId?: string;
+  sessionId?: string;
+  doctorId?: string;
+  assistantId?: string;
+  time?: string;
 }
 
 export interface DiagnosisRecord extends BaseRecord {
@@ -41,8 +47,14 @@ export interface DiagnosisRecord extends BaseRecord {
   clinicalDx?: string;
   dxValue?: string;
   price: number;
-  status: "done" | "planned";
+  status: "done" | "planned" | "cancelled";
+  // ⭐ فیلدهای جدید — همه optional
+  sessionId?: string;
+  doctorId?: string;
+  assistantId?: string;
+  time?: string;
 }
+
 
 export type OdontogramRecord = StatusRecord | TreatmentRecord | DiagnosisRecord;
 

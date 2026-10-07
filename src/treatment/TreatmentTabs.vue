@@ -3,26 +3,35 @@ import { ref } from "vue";
 import StatusPanel from "./StatusPanel.vue";
 import TreatmentPanel from "./TreatmentPanel.vue";
 import DiagnosisPanel from "./DiagnosisPanel.vue";
+import TreatmentPlanPanel from "./TreatmentPlanPanel.vue";
+import SessionsPanel from "./SessionsPanel.vue";
 
-const props = defineProps<{
+defineProps<{
   patientId: string;
 }>();
 
-type TabId = "status" | "treatment" | "diagnosis";
+type TabId = "treatment" | "plan" | "sessions" | "diagnosis" | "status";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "status",    label: "ثبت وضعیت",  icon: "🦷" },
-  { id: "treatment", label: "ثبت درمان",  icon: "🛠" },
-  { id: "diagnosis", label: "تشخیص",      icon: "🔬" },
+  { id: "treatment", label: "درمان / طرح", icon: "🛠" },
+  { id: "plan",      label: "طرح درمان",   icon: "📋" },
+  { id: "sessions",  label: "جلسات",       icon: "📅" },
+  { id: "diagnosis", label: "تشخیص",       icon: "🔬" },
+  { id: "status",    label: "وضعیت",       icon: "🦷" },
 ];
 
-const activeTab = ref<TabId>("status");
+const activeTab = ref<TabId>("treatment");
 </script>
 
 <template>
-  <div class="treatment-tabs" dir="rtl">
-    <!-- تب‌های اصلی -->
-    <div class="main-tabs" role="tablist">
+  <div
+    class="treatment-tabs"
+    dir="rtl"
+  >
+    <div
+      class="main-tabs"
+      role="tablist"
+    >
       <button
         v-for="tab in TABS"
         :key="tab.id"
@@ -37,18 +46,28 @@ const activeTab = ref<TabId>("status");
       </button>
     </div>
 
-    <!-- محتوای تب -->
-    <div class="tab-content" role="tabpanel">
-      <StatusPanel
-        v-if="activeTab === 'status'"
+    <div
+      class="tab-content"
+      role="tabpanel"
+    >
+      <TreatmentPanel
+        v-if="activeTab === 'treatment'"
         :patient-id="patientId"
       />
-      <TreatmentPanel
-        v-else-if="activeTab === 'treatment'"
+      <TreatmentPlanPanel
+        v-else-if="activeTab === 'plan'"
+        :patient-id="patientId"
+      />
+      <SessionsPanel
+        v-else-if="activeTab === 'sessions'"
         :patient-id="patientId"
       />
       <DiagnosisPanel
         v-else-if="activeTab === 'diagnosis'"
+        :patient-id="patientId"
+      />
+      <StatusPanel
+        v-else-if="activeTab === 'status'"
         :patient-id="patientId"
       />
     </div>
@@ -64,14 +83,14 @@ const activeTab = ref<TabId>("status");
   gap: 8px;
 }
 
-/* ─── تب‌های اصلی ─── */
 .main-tabs {
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  gap: 2px;
+  padding: 3px;
   background: #f3f4f6;
   border-radius: 10px;
   flex-shrink: 0;
+  overflow-x: auto;
 }
 
 .main-tab {
@@ -79,53 +98,28 @@ const activeTab = ref<TabId>("status");
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 8px;
+  gap: 4px;
+  padding: 8px 6px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: #6b7280;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
-.main-tab:hover {
-  background: #e5e7eb;
-  color: #1f2937;
-}
+.main-tab:hover { background: #e5e7eb; color: #1f2937; }
+.main-tab.active { background: #fff; color: #2563eb; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.tab-icon { font-size: 14px; }
 
-.main-tab.active {
-  background: #fff;
-  color: #2563eb;
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
+.tab-content { flex: 1; min-height: 0; overflow-y: auto; }
 
-.tab-icon {
-  font-size: 16px;
-}
-
-/* ─── محتوا ─── */
-.tab-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* موبایل: تب‌ها به‌صورت ستونی کوچک‌تر */
 @media (max-width: 480px) {
-  .tab-label {
-    display: none;
-  }
-  .main-tab {
-    padding: 10px 6px;
-  }
-  .tab-icon {
-    font-size: 20px;
-  }
+  .tab-label { display: none; }
+  .tab-icon { font-size: 18px; }
 }
 </style>
