@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { onStateChange, onSelectionChange } from "../odontogram";
 import { getRecordsForPatient } from "./treatmentStore";
-import type { OdontogramRecord, TreatmentRecord, DiagnosisRecord } from "./treatmentStore";
+import type { TreatmentRecord, DiagnosisRecord } from "./treatmentStore";
+import { onStateChange, onSelectionChange } from "../odontogram";
 import { getStaffById } from "./treatmentPlanStore";
 
 const props = defineProps<{
@@ -10,13 +10,12 @@ const props = defineProps<{
 }>();
 
 const expandedSessionKey = ref<string | null>(null);
+const filterMode = ref<"all" | "upcoming" | "today" | "past">("all");
 
 let unsubState: (() => void) | undefined;
 let unsubSel: (() => void) | undefined;
 
-function refresh() {
-  /* force re-render */
-}
+function refresh() { /* force re-render */ }
 
 onMounted(() => {
   unsubState = onStateChange(() => refresh());
@@ -28,38 +27,44 @@ onUnmounted(() => {
   unsubSel?.();
 });
 
-// ═══ Sessions خودکار از date گروه‌بندی میشن ═══
 interface AutoSession {
   key: string;
   date: string;
-  time?: string;
-  records: OdontogramRecord[];
+  records: (TreatmentRecord | DiagnosisRecord)[];
   totalPrice: number;
   doneCount: number;
   plannedCount: number;
+  doctorNames: string[];
 }
 
-const sessions = computed<AutoSession[]>(() => {
+const allSessions = computed<AutoSession[]>(() => {
   const records = getRecordsForPatient(props.patientId).filter(
     (r): r is TreatmentRecord | DiagnosisRecord =>
       r.kind === "treatment" || r.kind === "diagnosis",
   );
 
-  const grouped = new Map<string, OdontogramRecord[]>();
+  const grouped = new Map<string, (TreatmentRecord | DiagnosisRecord)[]>();
   for (const r of records) {
-    const key = r.date || "—";
+    // ⭐ از sessionDate استفاده کن (اگه داره)، وگرنه date
+    const key = (r as TreatmentRecord).sessionDate || r.date;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(r);
   }
 
   return Array.from(grouped.entries())
     .map(([date, recs]) => {
-      const totalPrice = recs.reduce((sum, r) => {
-        if ("price" in r && typeof r.price === "number") return sum + r.price;
-        return sum;
-      }, 0);
-      const doneCount = recs.filter((r) => "status" in r && r.status === "done").length;
-      const plannedCount = recs.filter((r) => "status" in r && r.status === "planned").length;
+      const totalPrice = recs.reduce((s, r) => s + (r.price || 0), 0);
+      const doneCount = recs.filter((r) => r.status === "done").length;
+      const plannedCount = recs.filter((r) => r.status === "planned").length;
+      const doctorNames = [
+        ...new Set(
+          recs
+            .map((r) => ("doctorId" in r ? r.doctorId : undefined))
+            .filter((id): id is string => !!id)
+            .map((id) => getStaffById(id)?.name ?? "")
+            .filter(Boolean),
+        ),
+      ];
       return {
         key: date,
         date,
@@ -67,9 +72,34 @@ const sessions = computed<AutoSession[]>(() => {
         totalPrice,
         doneCount,
         plannedCount,
+        doctorNames,
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
+});
+
+const sessions = computed(() => {
+  const today = new Date().toISOString().slice(0, 10);
+  switch (filterMode.value) {
+    case "today":
+      return allSessions.value.filter((s) => s.date === today);
+    case "upcoming":
+      return allSessions.value.filter((s) => s.date > today);
+    case "past":
+      return allSessions.value.filter((s) => s.date < today);
+    default:
+      return allSessions.value;
+  }
+});
+
+const counts = computed(() => {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    all: allSessions.value.length,
+    today: allSessions.value.filter((s) => s.date === today).length,
+    upcoming: allSessions.value.filter((s) => s.date > today).length,
+    past: allSessions.value.filter((s) => s.date < today).length,
+  };
 });
 
 function toggleExpand(key: string) {
@@ -93,15 +123,9 @@ function formatPrice(n: number): string {
   return n.toLocaleString("fa-IR") + " ت";
 }
 
-function getRecordLabelLocal(rec: OdontogramRecord): string {
+function getRecordLabel(rec: TreatmentRecord | DiagnosisRecord): string {
   if (rec.kind === "treatment") return rec.treatmentLabel;
-  if (rec.kind === "diagnosis") return rec.planLabel ?? rec.clinicalDx ?? "تشخیص";
-  return rec.itemId;
-}
-
-function getDoctorName(id?: string): string {
-  if (!id) return "—";
-  return getStaffById(id)?.name ?? "—";
+  return rec.planLabel ?? rec.clinicalDx ?? "تشخیص";
 }
 
 function isToday(date: string): boolean {
@@ -112,61 +136,43 @@ function isFuture(date: string): boolean {
   return date > new Date().toISOString().slice(0, 10);
 }
 
-// ═══ Print ═══
 function printSession(session: AutoSession) {
   const html = `
     <!DOCTYPE html>
     <html dir="rtl" lang="fa">
     <head>
       <meta charset="UTF-8">
-      <title>گزارش جلسه - ${session.date}</title>
+      <title>جلسه ${session.date}</title>
       <style>
         body { font-family: Tahoma, sans-serif; padding: 20px; }
         h1 { font-size: 18px; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
         th { background: #2563eb; color: #fff; }
-        tr:nth-child(even) { background: #f9f9f9; }
-        .total { margin-top: 16px; padding: 10px; background: #eff6ff; border-radius: 6px; font-size: 14px; font-weight: bold; }
+        .total { margin-top: 16px; padding: 10px; background: #eff6ff; border-radius: 6px; font-weight: bold; }
       </style>
     </head>
     <body>
-      <h1>📅 جلسه درمان — ${formatDate(session.date)}</h1>
+      <h1>📅 ${formatDate(session.date)}</h1>
       <table>
-        <thead>
-          <tr>
-            <th>دندان</th>
-            <th>درمان</th>
-            <th>وضعیت</th>
-            <th>قیمت</th>
-          </tr>
-        </thead>
+        <thead><tr><th>دندان</th><th>درمان</th><th>وضعیت</th><th>قیمت</th></tr></thead>
         <tbody>
           ${session.records.map((r) => `
             <tr>
               <td>#${r.toothNo}</td>
-              <td>${getRecordLabelLocal(r)}</td>
-              <td>${"status" in r && r.status === "done" ? "انجام‌شده" : "طرح"}</td>
-              <td>${"price" in r && r.price ? formatPrice(r.price) : "—"}</td>
+              <td>${getRecordLabel(r)}</td>
+              <td>${r.status === "done" ? "انجام‌شده" : "طرح"}</td>
+              <td>${r.price ? formatPrice(r.price) : "—"}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
-      <div class="total">
-        مجموع هزینه: ${formatPrice(session.totalPrice)}
-      </div>
-      <div style="margin-top: 20px; text-align: center; font-size: 11px; color: #999;">
-        تاریخ چاپ: ${new Date().toLocaleDateString("fa-IR")}
-      </div>
+      <div class="total">مجموع: ${formatPrice(session.totalPrice)}</div>
     </body>
     </html>
   `;
-
   const w = window.open("", "_blank");
-  if (!w) {
-    alert("برای چاپ، پاپ‌آپ را فعال کنید");
-    return;
-  }
+  if (!w) return;
   w.document.write(html);
   w.document.close();
   setTimeout(() => w.print(), 300);
@@ -174,30 +180,33 @@ function printSession(session: AutoSession) {
 </script>
 
 <template>
-  <div
-    class="sessions-panel"
-    dir="rtl"
-  >
+  <div class="sessions-panel" dir="rtl">
     <div class="panel-header">
-      <h3>📅 جلسات درمان</h3>
-      <div class="header-hint">
-        جلسات خودکار از تاریخ درمان‌ها ساخته می‌شن
-      </div>
+      <h3>📅 جلسات</h3>
+      <div class="header-hint">جلسات خودکار از تاریخ‌ها ساخته می‌شن</div>
     </div>
 
-    <div
-      v-if="sessions.length === 0"
-      class="empty-state"
-    >
+    <div class="filters">
+      <button :class="['filter-btn', { active: filterMode === 'all' }]" @click="filterMode = 'all'">
+        همه ({{ counts.all }})
+      </button>
+      <button :class="['filter-btn', { active: filterMode === 'upcoming' }]" @click="filterMode = 'upcoming'">
+        📅 آینده ({{ counts.upcoming }})
+      </button>
+      <button :class="['filter-btn', { active: filterMode === 'today' }]" @click="filterMode = 'today'">
+        🟡 امروز ({{ counts.today }})
+      </button>
+      <button :class="['filter-btn', { active: filterMode === 'past' }]" @click="filterMode = 'past'">
+        ⏳ گذشته ({{ counts.past }})
+      </button>
+    </div>
+
+    <div v-if="sessions.length === 0" class="empty-state">
       <div class="empty-icon">📅</div>
-      <div>هنوز جلسه‌ای ثبت نشده</div>
-      <div class="empty-hint">هر درمانی که ثبت کنی، بر اساس تاریخش اینجا گروه‌بندی می‌شه</div>
+      <div>هیچ جلسه‌ای در این فیلتر نیست</div>
     </div>
 
-    <div
-      v-else
-      class="sessions-list"
-    >
+    <div v-else class="sessions-list">
       <div
         v-for="session in sessions"
         :key="session.key"
@@ -207,44 +216,27 @@ function printSession(session: AutoSession) {
           future: isFuture(session.date),
         }]"
       >
-        <div
-          class="session-header"
-          @click="toggleExpand(session.key)"
-        >
+        <div class="session-header" @click="toggleExpand(session.key)">
           <div class="session-date-icon">
             <span class="icon">{{ isToday(session.date) ? "🟡" : isFuture(session.date) ? "📅" : "✅" }}</span>
           </div>
           <div class="session-info">
             <div class="session-title">
               {{ formatDate(session.date) }}
-              <span
-                v-if="isToday(session.date)"
-                class="today-badge"
-              >امروز</span>
+              <span v-if="isToday(session.date)" class="today-badge">امروز</span>
+              <span v-if="isFuture(session.date)" class="future-badge">آینده</span>
             </div>
             <div class="session-meta">
-              <span class="meta-item">🛠 {{ session.records.length }} درمان</span>
-              <span
-                v-if="session.doneCount > 0"
-                class="meta-item done"
-              >✅ {{ session.doneCount }}</span>
-              <span
-                v-if="session.plannedCount > 0"
-                class="meta-item planned"
-              >⏳ {{ session.plannedCount }}</span>
+              <span class="meta-item">🛠 {{ session.records.length }} مورد</span>
+              <span v-if="session.doneCount > 0" class="meta-item done">✅ {{ session.doneCount }}</span>
+              <span v-if="session.plannedCount > 0" class="meta-item planned">⏳ {{ session.plannedCount }}</span>
             </div>
           </div>
-          <div class="session-total">
-            {{ formatPrice(session.totalPrice) }}
-          </div>
+          <div class="session-total">{{ formatPrice(session.totalPrice) }}</div>
           <span class="expand-icon">{{ expandedSessionKey === session.key ? "▲" : "▼" }}</span>
         </div>
 
-        <!-- Body -->
-        <div
-          v-if="expandedSessionKey === session.key"
-          class="session-body"
-        >
+        <div v-if="expandedSessionKey === session.key" class="session-body">
           <table class="data-table">
             <thead>
               <tr>
@@ -256,39 +248,30 @@ function printSession(session: AutoSession) {
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="rec in session.records"
-                :key="rec.id"
-                :class="{ 'row-done': 'status' in rec && rec.status === 'done' }"
-              >
+              <tr v-for="rec in session.records" :key="rec.id" :class="{ 'row-done': rec.status === 'done' }">
                 <td>#{{ rec.toothNo }}</td>
-                <td>{{ getRecordLabelLocal(rec) }}</td>
-                <td>{{ "doctorId" in rec ? getDoctorName(rec.doctorId) : "—" }}</td>
+                <td>{{ getRecordLabel(rec) }}</td>
+                <td>{{ "doctorId" in rec && rec.doctorId ? getStaffById(rec.doctorId)?.name ?? "—" : "—" }}</td>
                 <td>
-                  <span :class="['status-pill', 'status' in rec ? rec.status : 'planned']">
-                    {{ "status" in rec && rec.status === "done" ? "✅ انجام" : "⏳ طرح" }}
+                  <span :class="['status-pill', rec.status]">
+                    {{ rec.status === "done" ? "✅ انجام" : "⏳ طرح" }}
                   </span>
                 </td>
-                <td class="price-cell">
-                  {{ "price" in rec && rec.price ? formatPrice(rec.price) : "—" }}
-                </td>
+                <td class="price-cell">{{ rec.price ? formatPrice(rec.price) : "—" }}</td>
               </tr>
             </tbody>
           </table>
 
           <div class="session-actions">
-            <button
-              class="btn-print"
-              @click="printSession(session)"
-            >
-              🖨 چاپ جلسه
-            </button>
+            <button class="btn-print" @click="printSession(session)">🖨 چاپ جلسه</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+
 
 <style scoped>
 .sessions-panel {

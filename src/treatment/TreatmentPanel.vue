@@ -6,7 +6,12 @@ import {
   onStateChange,
 } from "../odontogram";
 import { getRecordsForTooth } from "./treatmentStore";
-import { submitTreatment, deleteRecord } from "./applyTreatment";
+import {
+  submitTreatment,
+  deleteRecord,
+  getPlanOptions,
+  getNextSessionNumberForPlan,
+} from "./applyTreatment";
 import type { TreatmentRecord } from "./treatmentStore";
 import TreatmentForm from "./TreatmentForm.vue";
 
@@ -58,10 +63,47 @@ function onSubmit(payload: {
   date: string;
   time: string;
 }) {
+  // ⭐ planTitle رو از planId پیدا کن
+  let planTitle: string | undefined;
+  let sessionNumber: number | undefined;
+  let sessionTitle: string | undefined;
+
+  if (payload.planId) {
+    // از لیست طرح‌های موجود، عنوان رو بگیر
+    const planOptions = getPlanOptions(props.patientId);
+    planTitle = planOptions.find((p) => p.id === payload.planId)?.title;
+
+    // اگه sessionId داره، شماره و عنوان رو بگیر
+    if (payload.sessionId) {
+      // ⭐ sessionId یه چیزیه مثل "sess_xyz" — ولی ما شماره می‌خوایم
+      // بهتره TreatmentForm خودش sessionNumber پاس بده
+    } else {
+      // جلسه‌ی جدید
+      sessionNumber = getNextSessionNumberForPlan(props.patientId, payload.planId);
+      sessionTitle = `جلسه ${sessionNumber}`;
+    }
+  }
+
   for (const toothNo of selectedTeeth.value) {
     submitTreatment(props.patientId, toothNo, {
-      ...payload,
+      treatmentId: payload.treatmentId,
+      treatmentLabel: payload.treatmentLabel,
+      category: payload.category,
       surface: payload.surfaces?.[0],
+      material: payload.material,
+      price: payload.price,
+      status: payload.status,
+      note: payload.note,
+      // ⭐ جدید
+      planId: payload.planId,
+      planTitle,
+      sessionNumber,
+      sessionTitle,
+      sessionDate: payload.date,
+      sessionTime: payload.time,
+      doctorId: payload.doctorId,
+      assistantId: payload.assistantId,
+      time: payload.time,
     });
   }
   refresh();

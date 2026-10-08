@@ -1,35 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
-  getPlansForPatient,
-  getSessionsForPlan,
-  type TreatmentPlan,
-  type PlanStatus,
-  type TreatmentSession,
-} from "./treatmentPlanStore";
-import { onStateChange, onSelectionChange, getSelectedTeeth } from "../odontogram";
-import {
-  getRecordsForPlan,
-  getRecordsForSession,
+  getPlanGroupsForPatient,
+  type PlanGroup,
 } from "./applyTreatment";
-import type { OdontogramRecord } from "./treatmentStore";
+import { onStateChange, onSelectionChange } from "../odontogram";
+import { getStaffById } from "./treatmentPlanStore";
 
 const props = defineProps<{
   patientId: string;
 }>();
 
 const expandedPlanId = ref<string | null>(null);
-const selectedTeeth = ref<number[]>([]);
+const expandedSessionKey = ref<string | null>(null);
 
 let unsubState: (() => void) | undefined;
 let unsubSel: (() => void) | undefined;
 
-function refresh() {
-  selectedTeeth.value = getSelectedTeeth();
-}
+function refresh() { /* force re-render */ }
 
 onMounted(() => {
-  refresh();
   unsubState = onStateChange(() => refresh());
   unsubSel = onSelectionChange(() => refresh());
 });
@@ -39,10 +29,14 @@ onUnmounted(() => {
   unsubSel?.();
 });
 
-const plans = computed(() => getPlansForPatient(props.patientId));
+const plans = computed(() => getPlanGroupsForPatient(props.patientId));
 
 function toggleExpand(planId: string) {
   expandedPlanId.value = expandedPlanId.value === planId ? null : planId;
+}
+
+function toggleSession(key: string) {
+  expandedSessionKey.value = expandedSessionKey.value === key ? null : key;
 }
 
 function formatDate(iso: string): string {
@@ -57,174 +51,78 @@ function formatPrice(n: number): string {
   return n.toLocaleString("fa-IR") + " ت";
 }
 
-function getPlanStats(planId: string) {
-  const sessions = getSessionsForPlan(planId);
-  const records = getRecordsForPlan(props.patientId, planId);
-  const done = records.filter((r) => "status" in r && r.status === "done").length;
-  const planned = records.filter((r) => "status" in r && r.status === "planned").length;
-  const total = records.length;
-  const progress = total > 0 ? Math.round((done / total) * 100) : 0;
-
-  const totalPrice = records.reduce((sum, r) => {
-    if ("price" in r && typeof r.price === "number") return sum + r.price;
-    return sum;
-  }, 0);
-  const donePrice = records
-    .filter((r) => "status" in r && r.status === "done")
-    .reduce((sum, r) => {
-      if ("price" in r && typeof r.price === "number") return sum + r.price;
-      return sum;
-    }, 0);
-  const remainingPrice = totalPrice - donePrice;
-
-  return {
-    sessions: sessions.length,
-    done,
-    planned,
-    total,
-    progress,
-    totalPrice,
-    donePrice,
-    remainingPrice,
-  };
+function getDoctorName(id?: string): string {
+  if (!id) return "—";
+  return getStaffById(id)?.name ?? "—";
 }
 
-function getRecordLabelLocal(rec: OdontogramRecord): string {
-  if (rec.kind === "treatment") return rec.treatmentLabel;
-  if (rec.kind === "diagnosis") return rec.planLabel ?? rec.clinicalDx ?? "تشخیص";
-  return rec.itemId;
-}
-
-const STATUS_LABELS: Record<PlanStatus, string> = {
-  planned: "برنامه‌ریزی‌شده",
-  "in-progress": "در حال انجام",
-  completed: "تکمیل‌شده",
-  cancelled: "لغو شده",
-};
-
-const STATUS_COLORS: Record<PlanStatus, string> = {
-  planned: "#f59e0b",
-  "in-progress": "#2563eb",
-  completed: "#16a34a",
-  cancelled: "#dc2626",
-};
-
-// ═══ Print ═══
-function printPlan(plan: TreatmentPlan) {
-  const stats = getPlanStats(plan.id);
-  const sessions = getSessionsForPlan(plan.id);
-  const records = getRecordsForPlan(props.patientId, plan.id);
-
+function printPlan(plan: PlanGroup) {
   const html = `
     <!DOCTYPE html>
     <html dir="rtl" lang="fa">
     <head>
       <meta charset="UTF-8">
-      <title>طرح درمان - ${plan.title}</title>
+      <title>طرح درمان - ${plan.planTitle}</title>
       <style>
         body { font-family: Tahoma, sans-serif; padding: 20px; color: #111; }
         h1 { font-size: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
         .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; font-size: 13px; }
         .meta div { padding: 6px; background: #f5f5f5; border-radius: 4px; }
-        .meta strong { color: #555; }
+        .progress-bar { height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin: 8px 0; }
+        .progress-fill { height: 100%; background: #f59e0b; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
         th { background: #2563eb; color: #fff; }
-        tr:nth-child(even) { background: #f9f9f9; }
-        .progress-bar { height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin: 8px 0; }
-        .progress-fill { height: 100%; background: #16a34a; transition: width 0.3s; }
         .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
         .stat { padding: 10px; background: #eff6ff; border-radius: 6px; text-align: center; }
-        .stat-value { font-size: 18px; font-weight: bold; color: #1e40af; }
+        .stat-value { font-size: 16px; font-weight: bold; color: #1e40af; }
         .stat-label { font-size: 11px; color: #666; margin-top: 4px; }
       </style>
     </head>
     <body>
-      <h1>📋 ${plan.title}</h1>
+      <h1>📋 ${plan.planTitle}</h1>
       <div class="meta">
         <div><strong>تاریخ شروع:</strong> ${formatDate(plan.startDate)}</div>
-        <div><strong>وضعیت:</strong> ${STATUS_LABELS[plan.status]}</div>
         <div><strong>دندان‌ها:</strong> ${plan.toothNos.join(", ") || "—"}</div>
-        <div><strong>تعداد جلسات:</strong> ${stats.sessions}</div>
+        <div><strong>تعداد درمان:</strong> ${plan.totalCount}</div>
+        <div><strong>تعداد جلسات:</strong> ${plan.sessions.length}</div>
       </div>
-
-      <h2>پیشرفت طرح</h2>
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: ${stats.progress}%"></div>
-      </div>
-      <div style="text-align:center; font-size: 14px; margin-bottom: 12px;">${stats.progress}%</div>
-
+      <h2>پیشرفت: ${plan.progress}%</h2>
+      <div class="progress-bar"><div class="progress-fill" style="width: ${plan.progress}%"></div></div>
       <div class="stats">
         <div class="stat">
-          <div class="stat-value">${stats.done}/${stats.total}</div>
-          <div class="stat-label">درمان انجام‌شده</div>
+          <div class="stat-value">${plan.doneCount}/${plan.totalCount}</div>
+          <div class="stat-label">انجام‌شده</div>
         </div>
         <div class="stat">
-          <div class="stat-value">${formatPrice(stats.donePrice)}</div>
-          <div class="stat-label">هزینه‌ی انجام‌شده</div>
+          <div class="stat-value">${formatPrice(plan.donePrice)}</div>
+          <div class="stat-label">هزینه انجام</div>
         </div>
         <div class="stat">
-          <div class="stat-value">${formatPrice(stats.remainingPrice)}</div>
+          <div class="stat-value">${formatPrice(plan.remainingPrice)}</div>
           <div class="stat-label">باقی‌مانده</div>
         </div>
       </div>
-
       <h2>جلسات</h2>
       <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>عنوان</th>
-            <th>تاریخ</th>
-            <th>وضعیت</th>
-          </tr>
-        </thead>
+        <thead><tr><th>#</th><th>عنوان</th><th>تاریخ</th><th>درمان‌ها</th><th>هزینه</th></tr></thead>
         <tbody>
-          ${sessions.map((s) => `
+          ${plan.sessions.map((s) => `
             <tr>
               <td>${s.sessionNumber}</td>
-              <td>${s.title}</td>
+              <td>${s.sessionTitle}</td>
               <td>${formatDate(s.sessionDate)}</td>
-              <td>${s.status === "done" ? "انجام‌شده" : s.status === "cancelled" ? "لغو" : "در انتظار"}</td>
+              <td>${s.records.length}</td>
+              <td>${formatPrice(s.totalPrice)}</td>
             </tr>
-          `).join("") || "<tr><td colspan='4' style='text-align:center'>—</td></tr>"}
+          `).join("") || "<tr><td colspan='5' style='text-align:center'>—</td></tr>"}
         </tbody>
       </table>
-
-      <h2>درمان‌ها (${records.length})</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>دندان</th>
-            <th>درمان</th>
-            <th>وضعیت</th>
-            <th>قیمت</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${records.map((r) => `
-            <tr>
-              <td>#${r.toothNo}</td>
-              <td>${getRecordLabelLocal(r)}</td>
-              <td>${"status" in r && r.status === "done" ? "انجام‌شده" : "طرح"}</td>
-              <td>${"price" in r && r.price ? formatPrice(r.price) : "—"}</td>
-            </tr>
-          `).join("") || "<tr><td colspan='4' style='text-align:center'>—</td></tr>"}
-        </tbody>
-      </table>
-
-      <div style="margin-top: 20px; text-align: center; font-size: 11px; color: #999;">
-        تاریخ چاپ: ${new Date().toLocaleDateString("fa-IR")}
-      </div>
     </body>
     </html>
   `;
-
   const w = window.open("", "_blank");
-  if (!w) {
-    alert("برای چاپ، لطفاً پاپ‌آپ را فعال کنید");
-    return;
-  }
+  if (!w) { alert("پاپ‌آپ را فعال کنید"); return; }
   w.document.write(html);
   w.document.close();
   setTimeout(() => w.print(), 300);
@@ -232,197 +130,134 @@ function printPlan(plan: TreatmentPlan) {
 </script>
 
 <template>
-  <div
-    class="plan-panel"
-    dir="rtl"
-  >
+  <div class="plan-panel" dir="rtl">
     <div class="panel-header">
       <h3>📋 طرح‌های درمان</h3>
       <div class="header-hint">
-        برای ساخت طرح جدید به تب «درمان/طرح» بروید
+        از تب «درمان / طرح» طرح جدید بساز
       </div>
     </div>
 
-    <div
-      v-if="plans.length === 0"
-      class="empty-state"
-    >
+    <div v-if="plans.length === 0" class="empty-state">
       <div class="empty-icon">📋</div>
       <div>هنوز طرح درمانی ثبت نشده</div>
-      <div class="empty-hint">از تب «درمان/طرح» یه درمان ثبت کن و حالت رو «طرح درمان» بذار</div>
+      <div class="empty-hint">به تب «درمان / طرح» برو، حالت رو «طرح درمان» کن</div>
     </div>
 
-    <div
-      v-else
-      class="plans-list"
-    >
+    <div v-else class="plans-list">
       <div
         v-for="plan in plans"
-        :key="plan.id"
-        :class="['plan-card', { expanded: expandedPlanId === plan.id }]"
+        :key="plan.planId"
+        :class="['plan-card', { expanded: expandedPlanId === plan.planId }]"
       >
-        <!-- Plan header -->
-        <div
-          class="plan-header"
-          @click="toggleExpand(plan.id)"
-        >
-          <span
-            class="plan-color"
-            :style="{ background: plan.color || '#2563eb' }"
-          ></span>
+        <div class="plan-header" @click="toggleExpand(plan.planId)">
+          <span class="plan-color"></span>
           <div class="plan-title-wrap">
-            <div class="plan-title">{{ plan.title }}</div>
+            <div class="plan-title">{{ plan.planTitle }}</div>
             <div class="plan-meta">
-              <span
-                class="plan-status"
-                :style="{
-                  background: STATUS_COLORS[plan.status] + '20',
-                  color: STATUS_COLORS[plan.status],
-                }"
-              >
-                {{ STATUS_LABELS[plan.status] }}
-              </span>
               <span class="plan-date">📅 {{ formatDate(plan.startDate) }}</span>
               <span class="plan-teeth">🦷 {{ plan.toothNos.length }}</span>
+              <span class="plan-sessions">📁 {{ plan.sessions.length }} جلسه</span>
             </div>
           </div>
           <div class="progress-mini">
             <div class="progress-bar-mini">
-              <div
-                class="progress-fill-mini"
-                :style="{ width: getPlanStats(plan.id).progress + '%' }"
-              ></div>
+              <div class="progress-fill-mini" :style="{ width: plan.progress + '%' }"></div>
             </div>
-            <span class="progress-text-mini">{{ getPlanStats(plan.id).progress }}%</span>
+            <span class="progress-text-mini">{{ plan.progress }}%</span>
           </div>
-          <span class="expand-icon">{{ expandedPlanId === plan.id ? "▲" : "▼" }}</span>
+          <span class="expand-icon">{{ expandedPlanId === plan.planId ? "▲" : "▼" }}</span>
         </div>
 
-        <!-- Plan body -->
-        <div
-          v-if="expandedPlanId === plan.id"
-          class="plan-body"
-        >
-          <!-- Stats grid -->
+        <div v-if="expandedPlanId === plan.planId" class="plan-body">
           <div class="stats-grid">
             <div class="stat-box">
-              <div class="stat-value">{{ getPlanStats(plan.id).total }}</div>
-              <div class="stat-label">کل درمان‌ها</div>
+              <div class="stat-value">{{ plan.totalCount }}</div>
+              <div class="stat-label">کل درمان</div>
             </div>
             <div class="stat-box green">
-              <div class="stat-value">{{ getPlanStats(plan.id).done }}</div>
+              <div class="stat-value">{{ plan.doneCount }}</div>
               <div class="stat-label">انجام‌شده</div>
             </div>
             <div class="stat-box orange">
-              <div class="stat-value">{{ getPlanStats(plan.id).planned }}</div>
+              <div class="stat-value">{{ plan.plannedCount }}</div>
               <div class="stat-label">در انتظار</div>
             </div>
             <div class="stat-box blue">
-              <div class="stat-value">{{ formatPrice(getPlanStats(plan.id).donePrice) }}</div>
-              <div class="stat-label">هزینه‌ی انجام</div>
+              <div class="stat-value">{{ formatPrice(plan.donePrice) }}</div>
+              <div class="stat-label">هزینه انجام</div>
             </div>
             <div class="stat-box purple">
-              <div class="stat-value">{{ formatPrice(getPlanStats(plan.id).totalPrice) }}</div>
-              <div class="stat-label">هزینه‌ی کل</div>
+              <div class="stat-value">{{ formatPrice(plan.totalPrice) }}</div>
+              <div class="stat-label">هزینه کل</div>
             </div>
             <div class="stat-box red">
-              <div class="stat-value">{{ formatPrice(getPlanStats(plan.id).remainingPrice) }}</div>
+              <div class="stat-value">{{ formatPrice(plan.remainingPrice) }}</div>
               <div class="stat-label">باقی‌مانده</div>
             </div>
           </div>
 
-          <!-- Progress bar -->
           <div class="progress-section">
-            <div class="progress-label">
-              پیشرفت طرح: {{ getPlanStats(plan.id).progress }}%
-            </div>
+            <div class="progress-label">پیشرفت طرح: {{ plan.progress }}%</div>
             <div class="progress-bar-large">
-              <div
-                class="progress-fill-large"
-                :style="{ width: getPlanStats(plan.id).progress + '%' }"
-              ></div>
+              <div class="progress-fill-large" :style="{ width: plan.progress + '%' }"></div>
             </div>
           </div>
 
-          <!-- Sessions table -->
-          <div
-            v-if="getSessionsForPlan(plan.id).length > 0"
-            class="sessions-section"
-          >
-            <h5 class="section-subtitle">📅 جلسات</h5>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>عنوان</th>
-                  <th>تاریخ</th>
-                  <th>وضعیت</th>
-                  <th>هزینه</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="sess in getSessionsForPlan(plan.id)"
-                  :key="sess.id"
+          <div v-if="plan.sessions.length > 0" class="sessions-section">
+            <h5 class="section-subtitle">📁 جلسات ({{ plan.sessions.length }})</h5>
+            <div class="sessions-list">
+              <div
+                v-for="sess in plan.sessions"
+                :key="sess.sessionNumber"
+                class="session-item"
+              >
+                <div class="session-header-row" @click="toggleSession(`${plan.planId}-${sess.sessionNumber}`)">
+                  <span class="session-num">{{ sess.sessionNumber }}</span>
+                  <span class="session-title">{{ sess.sessionTitle }}</span>
+                  <span class="session-date">📅 {{ formatDate(sess.sessionDate) }}</span>
+                  <span class="session-count">{{ sess.records.length }} درمان</span>
+                  <span class="session-price">{{ formatPrice(sess.totalPrice) }}</span>
+                  <span class="expand-mini">
+                    {{ expandedSessionKey === `${plan.planId}-${sess.sessionNumber}` ? "▲" : "▼" }}
+                  </span>
+                </div>
+
+                <div
+                  v-if="expandedSessionKey === `${plan.planId}-${sess.sessionNumber}`"
+                  class="session-records"
                 >
-                  <td><span class="num-badge">{{ sess.sessionNumber }}</span></td>
-                  <td>{{ sess.title }}</td>
-                  <td>{{ formatDate(sess.sessionDate) }}</td>
-                  <td>
-                    <span :class="['status-pill', sess.status]">
-                      {{ sess.status === "done" ? "✅ انجام" : sess.status === "cancelled" ? "❌ لغو" : "📅 در انتظار" }}
-                    </span>
-                  </td>
-                  <td class="price-cell">
-                    {{ formatPrice(getRecordsForSession(props.patientId, sess.id).reduce((s, r) => s + ("price" in r && typeof r.price === "number" ? r.price : 0), 0)) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>دندان</th>
+                        <th>درمان</th>
+                        <th>دکتر</th>
+                        <th>وضعیت</th>
+                        <th>قیمت</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="rec in sess.records" :key="rec.id">
+                        <td>#{{ rec.toothNo }}</td>
+                        <td>{{ rec.treatmentLabel }}</td>
+                        <td>{{ getDoctorName(rec.doctorId) }}</td>
+                        <td>
+                          <span :class="['status-pill', rec.status]">
+                            {{ rec.status === "done" ? "✅ انجام" : "⏳ طرح" }}
+                          </span>
+                        </td>
+                        <td class="price-cell">{{ formatPrice(rec.price) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Records table -->
-          <div
-            v-if="getRecordsForPlan(props.patientId, plan.id).length > 0"
-            class="records-section"
-          >
-            <h5 class="section-subtitle">🛠 درمان‌ها</h5>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>دندان</th>
-                  <th>درمان</th>
-                  <th>وضعیت</th>
-                  <th>قیمت</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="rec in getRecordsForPlan(props.patientId, plan.id)"
-                  :key="rec.id"
-                  :class="{ 'row-done': 'status' in rec && rec.status === 'done' }"
-                >
-                  <td>#{{ rec.toothNo }}</td>
-                  <td>{{ getRecordLabelLocal(rec) }}</td>
-                  <td>
-                    <span :class="['status-pill', 'status' in rec ? rec.status : 'planned']">
-                      {{ "status" in rec && rec.status === "done" ? "✅ انجام" : "⏳ طرح" }}
-                    </span>
-                  </td>
-                  <td class="price-cell">
-                    {{ "price" in rec && rec.price ? formatPrice(rec.price) : "—" }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Actions -->
           <div class="plan-actions">
-            <button
-              class="btn-print"
-              @click="printPlan(plan)"
-            >
+            <button class="btn-print" @click="printPlan(plan)">
               🖨 چاپ طرح
             </button>
           </div>
@@ -431,6 +266,8 @@ function printPlan(plan: TreatmentPlan) {
     </div>
   </div>
 </template>
+
+
 
 <style scoped>
 .plan-panel {

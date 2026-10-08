@@ -310,12 +310,19 @@ export function submitTreatment(
     note?: string;
     // ⭐ جدید
     planId?: string;
-    sessionId?: string;
+    planTitle?: string;
+    sessionNumber?: number;
+    sessionTitle?: string;
+    sessionDate?: string;
+    sessionTime?: string;
     doctorId?: string;
     assistantId?: string;
     time?: string;
   },
 ): TreatmentRecord {
+   const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = treatment.time || now.toTimeString().slice(0, 5);
   const newRecord: Omit<TreatmentRecord, "id" | "createdAt"> = {
     kind: "treatment",
     patientId,
@@ -329,19 +336,146 @@ export function submitTreatment(
     material: treatment.material,
     price: treatment.price,
     status: treatment.status,
-    // ⭐ جدید
     planId: treatment.planId,
-    sessionId: treatment.sessionId,
+    planTitle: treatment.planTitle,
+    sessionNumber: treatment.sessionNumber,
+    sessionTitle: treatment.sessionTitle,
+    sessionDate: treatment.sessionDate || dateStr,
+    sessionTime: treatment.sessionTime || timeStr,
     doctorId: treatment.doctorId,
     assistantId: treatment.assistantId,
-    time: treatment.time,
+    time: timeStr,
   };
 
   const rec = addRecord(newRecord) as TreatmentRecord;
   recomputeToothState(patientId, toothNo);
   return rec;
 }
+// ═══════════════════════════════════════════════
+// ⭐ Query برای طرح‌های درمان
+// ═══════════════════════════════════════════════
 
+export interface PlanGroup {
+  planId: string;
+  planTitle: string;
+  records: TreatmentRecord[];
+  toothNos: number[];
+  totalPrice: number;
+  donePrice: number;
+  remainingPrice: number;
+  doneCount: number;
+  plannedCount: number;
+  totalCount: number;
+  progress: number;
+  startDate: string;
+  sessions: SessionGroup[];
+}
+
+export interface SessionGroup {
+  sessionNumber: number;
+  sessionTitle: string;
+  sessionDate: string;
+  records: TreatmentRecord[];
+  totalPrice: number;
+  doneCount: number;
+  plannedCount: number;
+}
+
+/** گرفتن همه‌ی طرح‌ها، گروه‌بندی شده بر اساس planId */
+export function getPlanGroupsForPatient(patientId: string): PlanGroup[] {
+  const allRecords = getRecordsForPatient(patientId).filter(
+    (r): r is TreatmentRecord => r.kind === "treatment" && !!r.planId,
+  );
+
+  const grouped = new Map<string, TreatmentRecord[]>();
+  for (const r of allRecords) {
+    if (!r.planId) continue;
+    if (!grouped.has(r.planId)) grouped.set(r.planId, []);
+    grouped.get(r.planId)!.push(r);
+  }
+
+  const result: PlanGroup[] = [];
+
+  for (const [planId, recs] of grouped.entries()) {
+    const planTitle = recs.find((r) => r.planTitle)?.planTitle || "طرح بدون عنوان";
+
+    // گروه‌بندی جلسات
+    const sessionMap = new Map<number, TreatmentRecord[]>();
+    for (const r of recs) {
+      const num = r.sessionNumber ?? 0;
+      if (num === 0) continue;
+      if (!sessionMap.has(num)) sessionMap.set(num, []);
+      sessionMap.get(num)!.push(r);
+    }
+
+    const sessions: SessionGroup[] = [];
+    for (const [num, sessRecs] of sessionMap.entries()) {
+      sessions.push({
+        sessionNumber: num,
+        sessionTitle: sessRecs.find((r) => r.sessionTitle)?.sessionTitle || `جلسه ${num}`,
+        sessionDate: sessRecs[0].sessionDate || sessRecs[0].date,
+        records: sessRecs,
+        totalPrice: sessRecs.reduce((s, r) => s + r.price, 0),
+        doneCount: sessRecs.filter((r) => r.status === "done").length,
+        plannedCount: sessRecs.filter((r) => r.status === "planned").length,
+      });
+    }
+    sessions.sort((a, b) => a.sessionNumber - b.sessionNumber);
+
+    const totalPrice = recs.reduce((s, r) => s + r.price, 0);
+    const doneRecs = recs.filter((r) => r.status === "done");
+    const plannedRecs = recs.filter((r) => r.status === "planned");
+    const donePrice = doneRecs.reduce((s, r) => s + r.price, 0);
+    const progress = recs.length > 0 ? Math.round((doneRecs.length / recs.length) * 100) : 0;
+
+    const toothNos = [...new Set(recs.map((r) => r.toothNo))].sort((a, b) => a - b);
+
+    result.push({
+      planId,
+      planTitle,
+      records: recs,
+      toothNos,
+      totalPrice,
+      donePrice,
+      remainingPrice: totalPrice - donePrice,
+      doneCount: doneRecs.length,
+      plannedCount: plannedRecs.length,
+      totalCount: recs.length,
+      progress,
+      startDate: recs.reduce((min, r) => (r.date < min ? r.date : min), recs[0].date),
+      sessions,
+    });
+  }
+
+  return result.sort((a, b) => b.startDate.localeCompare(a.startDate));
+}
+
+/** گرفتن لیست طرح‌های موجود (برای dropdown) */
+export function getPlanOptions(patientId: string): { id: string; title: string }[] {
+  const records = getRecordsForPatient(patientId).filter(
+    (r): r is TreatmentRecord =>
+      r.kind === "treatment" && !!r.planId && !!r.planTitle,
+  );
+
+  const map = new Map<string, string>();
+  for (const r of records) {
+    if (r.planId && r.planTitle && !map.has(r.planId)) {
+      map.set(r.planId, r.planTitle);
+    }
+  }
+
+  return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
+}
+
+/** شماره‌ی جلسه‌ی بعدی برای یه طرح */
+export function getNextSessionNumberForPlan(patientId: string, planId: string): number {
+  const records = getRecordsForPatient(patientId).filter(
+    (r): r is TreatmentRecord =>
+      r.kind === "treatment" && r.planId === planId && !!r.sessionNumber,
+  );
+  if (records.length === 0) return 1;
+  return Math.max(...records.map((r) => r.sessionNumber ?? 0)) + 1;
+}
 export function submitDiagnosis(
   patientId: string,
   toothNo: number,

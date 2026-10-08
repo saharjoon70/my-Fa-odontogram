@@ -10,20 +10,13 @@ import {
 } from "./treatments";
 import {
   TREATMENT_TAB_CATEGORIES,
-  getCategoryLabel,
 } from "./categories";
 import { getTreatmentIcon } from "./treatmentIcons";
 import {
   previewTreatmentItem,
   resetToothToStoredState,
 } from "./applyTreatment";
-import {
-  getPlansForPatient,
-  getSessionsForPlan,
-  getDoctors,
-  getAssistants,
-  getNextSessionNumber,
-} from "./treatmentPlanStore";
+import { getPlansForPatient, getSessionsForPlan, getDoctors, getAssistants } from "./treatmentPlanStore";
 import StaffSelector from "./StaffSelector.vue";
 import DatePicker from "./DatePicker.vue";
 

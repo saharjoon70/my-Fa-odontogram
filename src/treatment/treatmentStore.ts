@@ -34,7 +34,12 @@ export interface TreatmentRecord extends BaseRecord {
   status: "done" | "planned" | "cancelled";
   // ⭐ فیلدهای جدید — همه optional
   planId?: string;
-  sessionId?: string;
+  sessionId?: string; 
+  planTitle?: string;
+  sessionNumber?: number;
+  sessionTitle?: string;
+  sessionDate?: string;
+  sessionTime?: string;
   doctorId?: string;
   assistantId?: string;
   time?: string;
@@ -50,6 +55,9 @@ export interface DiagnosisRecord extends BaseRecord {
   status: "done" | "planned" | "cancelled";
   // ⭐ فیلدهای جدید — همه optional
   sessionId?: string;
+  sessionNumber?: number;
+  sessionTitle?: string;
+  sessionDate?: string;
   doctorId?: string;
   assistantId?: string;
   time?: string;
