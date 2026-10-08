@@ -56,8 +56,9 @@ export interface StatusGroupMeta {
   icon: string;
   items: StatusItem[];
   radios?: StatusRadio[];
-  selects?: StatusSelect[];   // ⭐ این را اضافه کن
+  selects?: StatusSelect[];
   appliesWhen?: (state: Record<string, unknown>) => boolean;
+  surfaceCross?: boolean;
 }
 // ═══════════════════════════════════════════════
 // Helper functions

@@ -1,15 +1,13 @@
 // src/treatment/applyTreatment.ts
-// پل بین store و odontogram.ts
+// پل بین store و odontogram.ts — نسخه‌ی نهایی
 
 import { setToothStateAndRender } from "../odontogram";
 import {
   getRecordsForTooth,
-  getRecordsForPatient,   // ⭐ اضافه شد
+  getRecordsForPatient,
   addRecord,
   removeRecord,
 } from "./treatmentStore";
-
-
 import type {
   StatusRecord,
   TreatmentRecord,
@@ -17,33 +15,32 @@ import type {
   OdontogramRecord,
 } from "./treatmentStore";
 import {
-  deriveToothPatch,
   derivePatchFromRecords,
   treatmentToPatchPreview,
 } from "./deriveToothState";
 import type { TreatmentItem } from "./treatments";
 import type { StatePatch } from "./statusToState";
-import { STATUS_EXTRAS, type StatusExtra } from "./status_extras";
+import { getSessionsForPlan } from "./treatmentPlanStore";
+import { STATUS_EXTRAS } from "./status_extras";
 
 // ═══════════════════════════════════════════════
-// هسته
+// recompute
 // ═══════════════════════════════════════════════
 
 export function recomputeToothState(
   patientId: string,
   toothNo: number,
-): Record<string, unknown> {
-  const neutralPatch = buildNeutralPatch(patientId, toothNo);
-  setToothStateAndRender(toothNo, neutralPatch);
-
+): void {
   const records = getRecordsForTooth(patientId, toothNo);
   if (records.length > 0) {
-    const storedPatch = derivePatchFromRecords(records);
-    setToothStateAndRender(toothNo, storedPatch);
+    const patch = derivePatchFromRecords(records);
+    setToothStateAndRender(toothNo, patch);
   }
-
-  return {};
 }
+
+// ═══════════════════════════════════════════════
+// Preview
+// ═══════════════════════════════════════════════
 
 export function previewTreatmentOnTooth(
   toothNo: number,
@@ -67,163 +64,292 @@ export function applyPatchToTooth(toothNo: number, patch: StatePatch): void {
   setToothStateAndRender(toothNo, patch);
 }
 
-// ═══════════════════════════════════════════════
-// خواندن ساختار از store
-// ═══════════════════════════════════════════════
-
-function getStoredToothSelection(patientId: string, toothNo: number): string {
-  const records = getRecordsForTooth(patientId, toothNo);
-
-  const selectionRecords = records
-    .filter(
-      (r): r is StatusRecord =>
-        r.kind === "status" && r.itemId === "toothSelection",
-    )
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  if (selectionRecords.length > 0) {
-    return String(selectionRecords[0].value);
-  }
-
-  const implantRecord = records.find(
-    (r) => r.kind === "treatment" && r.treatmentId === "implant",
-  );
-  if (implantRecord) return "implant";
-
-  const extractionRecord = records.find(
-    (r) =>
-      r.kind === "treatment" && r.treatmentId.startsWith("extraction-"),
-  );
-  if (extractionRecord) return "none";
-
-  const dentureRecord = records.find(
-    (r) => r.kind === "treatment" && r.treatmentId.startsWith("denture-"),
-  );
-  if (dentureRecord) return "none";
-
-  return "tooth-base";
-}
-
-function getStoredToothSubstrate(patientId: string, toothNo: number): string {
-  const records = getRecordsForTooth(patientId, toothNo);
-
-  const substrateRecords = records
-    .filter(
-      (r): r is StatusRecord =>
-        r.kind === "status" && r.itemId === "toothSubstrate",
-    )
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  if (substrateRecords.length > 0) {
-    return String(substrateRecords[0].value);
-  }
-
-  const restoRecord = records.find(
-    (r) =>
-      r.kind === "treatment" &&
-      (r.treatmentId === "crown" || r.treatmentId === "temporary-crown"),
-  );
-  if (restoRecord) return "crownprep";
-
-  return "natural";
-}
-
-// ═══════════════════════════════════════════════
-// patch خنثی
-// ═══════════════════════════════════════════════
-
-function buildNeutralPatch(
-  patientId: string,
-  toothNo: number,
-): Record<string, unknown> {
-  const storedSelection = getStoredToothSelection(patientId, toothNo);
-  const storedSubstrate = getStoredToothSubstrate(patientId, toothNo);
-
-  return {
-    toothSelection: storedSelection,
-    toothSubstrate: storedSubstrate,
-    restorationType: "none",
-    restorationMaterial: "none",
-    fillingMaterial: "none",
-    fillingSurfaces: new Set<string>(),
-    fillingSurfaceMaterials: new Map<string, string>(),
-    fillingDefect: new Map<string, string>(),
-    prosthesis: "none",
-    endo: "none",
-    endoResection: false,
-    pulpDx: "normal",
-    pulpLatin: "none",
-    apicalDx: "normal",
-    periapicalType: "none",
-    resorptionType: "none",
-    periImplant: "none",
-    orthoAppliance: "none",
-    orthoDrift: "none",
-    orthoVertical: "none",
-    orthoRotation: false,
-    calculus: false,
-    fissureSealing: false,
-    mobility: "none",
-    mods: new Set<string>(),
-    caries: new Set<string>(),
-    cariesSeverity: new Map<string, number>(),
-    rootCaries: "none",
-    radiographicDepth: new Map<string, string>(),
-    crownLeakage: false,
-    crownReplace: false,
-    crownNeeded: false,
-    bridgePillar: false,
-    brokenMesial: false,
-    brokenIncisal: false,
-    brokenDistal: false,
-    extractionPlan: false,
-    extractionWound: false,
-    missingClosed: false,
-    wearEdge: "none",
-    wearCervical: "none",
-    discoloration: "none",
-    parapulpalPin: false,
-    contactMesial: false,
-    contactDistal: false,
-    customStates: {},
-  };
-}
-
-// ═══════════════════════════════════════════════
-// reset
-// ═══════════════════════════════════════════════
-
 export function clearPreviewLayers(
-  patientId: string,
+  _patientId: string,
   toothNo: number,
 ): void {
-  const patch = buildNeutralPatch(patientId, toothNo);
-  setToothStateAndRender(toothNo, patch);
+  setToothStateAndRender(toothNo, {});
 }
 
-export function resetToothToDefault(
-  patientId: string,
-  toothNo: number,
-): void {
-  clearPreviewLayers(patientId, toothNo);
-}
-
+/** بازگرداندن دندون به state ذخیره‌شده */
 export function resetToothToStoredState(
   patientId: string,
   toothNo: number,
 ): void {
-  const neutralPatch = buildNeutralPatch(patientId, toothNo);
-  setToothStateAndRender(toothNo, neutralPatch);
-
   const records = getRecordsForTooth(patientId, toothNo);
   if (records.length > 0) {
-    const storedPatch = derivePatchFromRecords(records);
-    setToothStateAndRender(toothNo, storedPatch);
+    const patch = derivePatchFromRecords(records);
+    setToothStateAndRender(toothNo, patch);
   }
 }
 
 // ═══════════════════════════════════════════════
-// ثبت
+// محاسبه‌ی مالی
+// ═══════════════════════════════════════════════
+
+export interface FinancialBreakdown {
+  price: number;
+  discountAmount: number;
+  afterDiscount: number;
+  insuranceAmount: number;
+  patientAmount: number;
+}
+
+export function calculateFinancials(rec: {
+  price: number;
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+}): FinancialBreakdown {
+  const price = rec.price || 0;
+
+  let discountAmount = 0;
+  if (rec.discountType === "percent" && rec.discountValue) {
+    discountAmount = Math.round((price * rec.discountValue) / 100);
+  } else if (rec.discountType === "amount" && rec.discountValue) {
+    discountAmount = rec.discountValue;
+  }
+  const afterDiscount = Math.max(0, price - discountAmount);
+
+  let insuranceAmount = 0;
+  if (rec.insuranceType === "percent" && rec.insuranceValue) {
+    insuranceAmount = Math.round((afterDiscount * rec.insuranceValue) / 100);
+  } else if (rec.insuranceType === "amount" && rec.insuranceValue) {
+    insuranceAmount = rec.insuranceValue;
+  }
+  const patientAmount = Math.max(0, afterDiscount - insuranceAmount);
+
+  return {
+    price,
+    discountAmount,
+    afterDiscount,
+    insuranceAmount,
+    patientAmount,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// Status Extras Preset
+// ═══════════════════════════════════════════════
+
+export function applyStatusExtraPreset(
+  _patientId: string,
+  extra: {
+    id: string;
+    type: string;
+    teeth?: number[];
+    material?: string;
+    arch?: "upper" | "lower";
+    implants?: number[];
+    missing?: number[];
+  },
+): void {
+  if (extra.type === "span" && extra.teeth) {
+    for (const toothNo of extra.teeth) {
+      setToothStateAndRender(toothNo, {
+        restorationType: "crown",
+        restorationMaterial: extra.material,
+        toothSubstrate: "crownprep",
+        bridgePillar: true,
+      });
+    }
+  } else if (extra.type === "arch-bridge" && extra.arch) {
+    const archTeeth =
+      extra.arch === "upper"
+        ? STATUS_EXTRAS.arches.upper
+        : STATUS_EXTRAS.arches.lower;
+    for (const toothNo of archTeeth) {
+      setToothStateAndRender(toothNo, {
+        restorationType: "crown",
+        restorationMaterial: extra.material,
+        toothSubstrate: "crownprep",
+        bridgePillar: true,
+      });
+    }
+  } else if (extra.type === "partial-removable" && extra.arch) {
+    const archTeeth =
+      extra.arch === "upper"
+        ? STATUS_EXTRAS.arches.upper
+        : STATUS_EXTRAS.arches.lower;
+    for (const toothNo of archTeeth) {
+      setToothStateAndRender(toothNo, {
+        prosthesis: "removable-partial",
+      });
+    }
+  } else if (extra.type === "full-removable" && extra.arch) {
+    const archTeeth =
+      extra.arch === "upper"
+        ? STATUS_EXTRAS.arches.upper
+        : STATUS_EXTRAS.arches.lower;
+    for (const toothNo of archTeeth) {
+      setToothStateAndRender(toothNo, {
+        prosthesis: "removable-full",
+      });
+    }
+  } else if (extra.type === "bar-denture") {
+    if (extra.implants) {
+      for (const toothNo of extra.implants) {
+        setToothStateAndRender(toothNo, {
+          toothSelection: "implant",
+          prosthesis: "bar-denture",
+        });
+      }
+    }
+    if (extra.missing) {
+      for (const toothNo of extra.missing) {
+        setToothStateAndRender(toothNo, {
+          toothSelection: "none",
+          prosthesis: "bar-denture",
+        });
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Submit Treatment
+// ═══════════════════════════════════════════════
+
+export function submitTreatment(
+  patientId: string,
+  toothNo: number,
+  treatment: {
+    treatmentId: string;
+    treatmentLabel: string;
+    category: string;
+    surface?: string;
+    material?: string;
+    price: number;
+    status: "done" | "planned" | "cancelled";
+    note?: string;
+    planId?: string;
+    planTitle?: string;
+    sessionId?: string;
+    sessionDate?: string;
+    sessionTime?: string;
+    doctorId?: string;
+    assistantId?: string;
+    time?: string;
+    discountType?: "percent" | "amount";
+    discountValue?: number;
+    discountReason?: string;
+    discountAmount?: number;
+    insuranceType?: "percent" | "amount" | "none";
+    insuranceValue?: number;
+    insuranceName?: string;
+    insuranceAmount?: number;
+    patientAmount?: number;
+  },
+): TreatmentRecord {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = treatment.time || now.toTimeString().slice(0, 5);
+
+  const newRecord: Omit<TreatmentRecord, "id" | "createdAt"> = {
+    kind: "treatment",
+    patientId,
+    toothNo,
+    date: dateStr,
+    note: treatment.note ?? "",
+    treatmentId: treatment.treatmentId,
+    treatmentLabel: treatment.treatmentLabel,
+    category: treatment.category,
+    surface: treatment.surface,
+    material: treatment.material,
+    price: treatment.price,
+    status: treatment.status,
+    planId: treatment.planId,
+    planTitle: treatment.planTitle,
+    sessionId: treatment.sessionId,
+    sessionDate: treatment.sessionDate || dateStr,
+    sessionTime: treatment.sessionTime || timeStr,
+    doctorId: treatment.doctorId,
+    assistantId: treatment.assistantId,
+    time: timeStr,
+    discountType: treatment.discountType,
+    discountValue: treatment.discountValue,
+    discountReason: treatment.discountReason,
+    discountAmount: treatment.discountAmount,
+    insuranceType: treatment.insuranceType,
+    insuranceValue: treatment.insuranceValue,
+    insuranceName: treatment.insuranceName,
+    insuranceAmount: treatment.insuranceAmount,
+    patientAmount: treatment.patientAmount,
+  };
+
+  const rec = addRecord(newRecord) as TreatmentRecord;
+  recomputeToothState(patientId, toothNo);
+  return rec;
+}
+
+// ═══════════════════════════════════════════════
+// Submit Diagnosis
+// ═══════════════════════════════════════════════
+
+export function submitDiagnosis(
+  patientId: string,
+  toothNo: number,
+  diagnosis: {
+    planId?: string;
+    sessionId?: string;
+    planLabel?: string;
+    clinicalDx?: string;
+    dxValue?: string;
+    price: number;
+    status: "done" | "planned" | "cancelled";
+    note?: string;
+    doctorId?: string;
+    assistantId?: string;
+    time?: string;
+    discountType?: "percent" | "amount";
+    discountValue?: number;
+    discountReason?: string;
+    discountAmount?: number;
+    insuranceType?: "percent" | "amount" | "none";
+    insuranceValue?: number;
+    insuranceName?: string;
+    insuranceAmount?: number;
+    patientAmount?: number;
+  },
+): DiagnosisRecord {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+
+  const newRecord: Omit<DiagnosisRecord, "id" | "createdAt"> = {
+    kind: "diagnosis",
+    patientId,
+    toothNo,
+    date: dateStr,
+    note: diagnosis.note ?? "",
+    planId: diagnosis.planId,
+    sessionId: diagnosis.sessionId,
+    planLabel: diagnosis.planLabel,
+    clinicalDx: diagnosis.clinicalDx,
+    dxValue: diagnosis.dxValue,
+    price: diagnosis.price,
+    status: diagnosis.status,
+    doctorId: diagnosis.doctorId,
+    assistantId: diagnosis.assistantId,
+    time: diagnosis.time,
+    discountType: diagnosis.discountType,
+    discountValue: diagnosis.discountValue,
+    discountReason: diagnosis.discountReason,
+    discountAmount: diagnosis.discountAmount,
+    insuranceType: diagnosis.insuranceType,
+    insuranceValue: diagnosis.insuranceValue,
+    insuranceName: diagnosis.insuranceName,
+    insuranceAmount: diagnosis.insuranceAmount,
+    patientAmount: diagnosis.patientAmount,
+  };
+
+  const rec = addRecord(newRecord) as DiagnosisRecord;
+  recomputeToothState(patientId, toothNo);
+  return rec;
+}
+
+// ═══════════════════════════════════════════════
+// Submit Status
 // ═══════════════════════════════════════════════
 
 export function submitStatus(
@@ -233,24 +359,6 @@ export function submitStatus(
   itemId: string,
   value: unknown,
 ): StatusRecord {
-  // ⭐ رکوردهای خاص FillingPanel — به‌جای derive، مستقیم اعمال می‌شوند
-if (groupId === "filling" && itemId === "all-surfaces") {
-  const v = value as { surfaces?: string[]; material?: string } | undefined;
-  const surfaces = v?.surfaces ?? [];
-  const material = v?.material ?? "none";
-
-  const materialsMap: Record<string, string> = {};
-  for (const s of surfaces) {
-    materialsMap[s] = material;
-  }
-
-  setToothStateAndRender(toothNo, {
-    fillingMaterial: material,
-    fillingSurfaces: surfaces,
-    fillingSurfaceMaterials: materialsMap,
-  });
-}
-
   const existing = getRecordsForTooth(patientId, toothNo).filter(
     (r): r is StatusRecord =>
       r.kind === "status" && r.groupId === groupId && r.itemId === itemId,
@@ -269,12 +377,7 @@ if (groupId === "filling" && itemId === "all-surfaces") {
   };
 
   const rec = addRecord(newRecord) as StatusRecord;
-
-  // ⭐ اگر رکورد از نوع FillingPanel نبود، recompute کن
-  if (!(groupId === "filling" && itemId.startsWith("surface-"))) {
-    recomputeToothState(patientId, toothNo);
-  }
-
+  recomputeToothState(patientId, toothNo);
   return rec;
 }
 
@@ -296,92 +399,56 @@ export function unsubmitStatus(
   return removed;
 }
 
-export function submitTreatment(
+// ═══════════════════════════════════════════════
+// Delete
+// ═══════════════════════════════════════════════
+
+export function deleteRecord(
   patientId: string,
   toothNo: number,
-  treatment: {
-    treatmentId: string;
-    treatmentLabel: string;
-    category: string;
-    surface?: string;
-    material?: string;
-    price: number;
-    status: "done" | "planned" | "cancelled";
-    note?: string;
-    // ⭐ جدید
-    planId?: string;
-    planTitle?: string;
-    sessionNumber?: number;
-    sessionTitle?: string;
-    sessionDate?: string;
-    sessionTime?: string;
-    doctorId?: string;
-    assistantId?: string;
-    time?: string;
-  },
-): TreatmentRecord {
-   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
-  const timeStr = treatment.time || now.toTimeString().slice(0, 5);
-  const newRecord: Omit<TreatmentRecord, "id" | "createdAt"> = {
-    kind: "treatment",
-    patientId,
-    toothNo,
-    date: new Date().toISOString().slice(0, 10),
-    note: treatment.note ?? "",
-    treatmentId: treatment.treatmentId,
-    treatmentLabel: treatment.treatmentLabel,
-    category: treatment.category,
-    surface: treatment.surface,
-    material: treatment.material,
-    price: treatment.price,
-    status: treatment.status,
-    planId: treatment.planId,
-    planTitle: treatment.planTitle,
-    sessionNumber: treatment.sessionNumber,
-    sessionTitle: treatment.sessionTitle,
-    sessionDate: treatment.sessionDate || dateStr,
-    sessionTime: treatment.sessionTime || timeStr,
-    doctorId: treatment.doctorId,
-    assistantId: treatment.assistantId,
-    time: timeStr,
-  };
-
-  const rec = addRecord(newRecord) as TreatmentRecord;
-  recomputeToothState(patientId, toothNo);
-  return rec;
+  recordId: string,
+): boolean {
+  const ok = removeRecord(recordId);
+  if (ok) recomputeToothState(patientId, toothNo);
+  return ok;
 }
+
 // ═══════════════════════════════════════════════
-// ⭐ Query برای طرح‌های درمان
+// Plan Groups
 // ═══════════════════════════════════════════════
 
 export interface PlanGroup {
   planId: string;
   planTitle: string;
-  records: TreatmentRecord[];
+  doctorId?: string;
   toothNos: number[];
-  totalPrice: number;
-  donePrice: number;
-  remainingPrice: number;
+  records: TreatmentRecord[];
   doneCount: number;
   plannedCount: number;
   totalCount: number;
   progress: number;
   startDate: string;
   sessions: SessionGroup[];
+  totalSessions: number;
+  doneSessions: number;
 }
 
 export interface SessionGroup {
+  sessionId: string;
   sessionNumber: number;
   sessionTitle: string;
   sessionDate: string;
+  sessionTime?: string;
+  status: "scheduled" | "done" | "cancelled";
+  doctorId?: string;
+  assistantId?: string;
   records: TreatmentRecord[];
-  totalPrice: number;
   doneCount: number;
   plannedCount: number;
+  totalCount: number;
+  progress: number;
 }
 
-/** گرفتن همه‌ی طرح‌ها، گروه‌بندی شده بر اساس planId */
 export function getPlanGroupsForPatient(patientId: string): PlanGroup[] {
   const allRecords = getRecordsForPatient(patientId).filter(
     (r): r is TreatmentRecord => r.kind === "treatment" && !!r.planId,
@@ -397,61 +464,85 @@ export function getPlanGroupsForPatient(patientId: string): PlanGroup[] {
   const result: PlanGroup[] = [];
 
   for (const [planId, recs] of grouped.entries()) {
-    const planTitle = recs.find((r) => r.planTitle)?.planTitle || "طرح بدون عنوان";
+    const planTitle =
+      recs.find((r) => r.planTitle)?.planTitle || "طرح بدون عنوان";
+    const doctorId = recs.find((r) => r.doctorId)?.doctorId;
 
-    // گروه‌بندی جلسات
-    const sessionMap = new Map<number, TreatmentRecord[]>();
+    const planSessions = getSessionsForPlan(planId);
+
+    const sessionMap = new Map<string, TreatmentRecord[]>();
     for (const r of recs) {
-      const num = r.sessionNumber ?? 0;
-      if (num === 0) continue;
-      if (!sessionMap.has(num)) sessionMap.set(num, []);
-      sessionMap.get(num)!.push(r);
+      if (!r.sessionId) continue;
+      if (!sessionMap.has(r.sessionId)) sessionMap.set(r.sessionId, []);
+      sessionMap.get(r.sessionId)!.push(r);
     }
 
     const sessions: SessionGroup[] = [];
-    for (const [num, sessRecs] of sessionMap.entries()) {
+    for (const [sessionId, sessRecs] of sessionMap.entries()) {
+      const sessionMeta = planSessions.find((s) => s.id === sessionId);
+      const sessDoneCount = sessRecs.filter((r) => r.status === "done").length;
+      const sessPlannedCount = sessRecs.filter(
+        (r) => r.status === "planned",
+      ).length;
+      const sessTotal = sessRecs.length;
+      const sessProgress =
+        sessTotal > 0 ? Math.round((sessDoneCount / sessTotal) * 100) : 0;
+
       sessions.push({
-        sessionNumber: num,
-        sessionTitle: sessRecs.find((r) => r.sessionTitle)?.sessionTitle || `جلسه ${num}`,
-        sessionDate: sessRecs[0].sessionDate || sessRecs[0].date,
+        sessionId,
+        sessionNumber: sessionMeta?.sessionNumber ?? 0,
+        sessionTitle: sessionMeta?.title ?? "جلسه",
+        sessionDate: sessionMeta?.sessionDate ?? sessRecs[0].date,
+        sessionTime: sessionMeta?.sessionTime,
+        status: sessionMeta?.status ?? "scheduled",
+        doctorId: sessionMeta?.doctorId,
+        assistantId: sessionMeta?.assistantId,
         records: sessRecs,
-        totalPrice: sessRecs.reduce((s, r) => s + r.price, 0),
-        doneCount: sessRecs.filter((r) => r.status === "done").length,
-        plannedCount: sessRecs.filter((r) => r.status === "planned").length,
+        doneCount: sessDoneCount,
+        plannedCount: sessPlannedCount,
+        totalCount: sessTotal,
+        progress: sessProgress,
       });
     }
     sessions.sort((a, b) => a.sessionNumber - b.sessionNumber);
 
-    const totalPrice = recs.reduce((s, r) => s + r.price, 0);
     const doneRecs = recs.filter((r) => r.status === "done");
     const plannedRecs = recs.filter((r) => r.status === "planned");
-    const donePrice = doneRecs.reduce((s, r) => s + r.price, 0);
-    const progress = recs.length > 0 ? Math.round((doneRecs.length / recs.length) * 100) : 0;
+    const progress =
+      recs.length > 0 ? Math.round((doneRecs.length / recs.length) * 100) : 0;
 
-    const toothNos = [...new Set(recs.map((r) => r.toothNo))].sort((a, b) => a - b);
+    const toothNos = [...new Set(recs.map((r) => r.toothNo))].sort(
+      (a, b) => a - b,
+    );
+
+    const startDate = recs.reduce(
+      (min, r) => (r.date < min ? r.date : min),
+      recs[0].date,
+    );
 
     result.push({
       planId,
       planTitle,
-      records: recs,
+      doctorId,
       toothNos,
-      totalPrice,
-      donePrice,
-      remainingPrice: totalPrice - donePrice,
+      records: recs,
       doneCount: doneRecs.length,
       plannedCount: plannedRecs.length,
       totalCount: recs.length,
       progress,
-      startDate: recs.reduce((min, r) => (r.date < min ? r.date : min), recs[0].date),
+      startDate,
       sessions,
+      totalSessions: sessions.length,
+      doneSessions: sessions.filter((s) => s.status === "done").length,
     });
   }
 
   return result.sort((a, b) => b.startDate.localeCompare(a.startDate));
 }
 
-/** گرفتن لیست طرح‌های موجود (برای dropdown) */
-export function getPlanOptions(patientId: string): { id: string; title: string }[] {
+export function getPlanOptions(
+  patientId: string,
+): { id: string; title: string }[] {
   const records = getRecordsForPatient(patientId).filter(
     (r): r is TreatmentRecord =>
       r.kind === "treatment" && !!r.planId && !!r.planTitle,
@@ -467,202 +558,26 @@ export function getPlanOptions(patientId: string): { id: string; title: string }
   return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
 }
 
-/** شماره‌ی جلسه‌ی بعدی برای یه طرح */
-export function getNextSessionNumberForPlan(patientId: string, planId: string): number {
-  const records = getRecordsForPatient(patientId).filter(
-    (r): r is TreatmentRecord =>
-      r.kind === "treatment" && r.planId === planId && !!r.sessionNumber,
-  );
-  if (records.length === 0) return 1;
-  return Math.max(...records.map((r) => r.sessionNumber ?? 0)) + 1;
-}
-export function submitDiagnosis(
-  patientId: string,
-  toothNo: number,
-  diagnosis: {
-    planId?: string;
-    planLabel?: string;
-    clinicalDx?: string;
-    dxValue?: string;
-    price: number;
-    status: "done" | "planned";
-    note?: string;
-  },
-): DiagnosisRecord {
-  const newRecord: Omit<DiagnosisRecord, "id" | "createdAt"> = {
-    kind: "diagnosis",
-    patientId,
-    toothNo,
-    date: new Date().toISOString().slice(0, 10),
-    note: diagnosis.note ?? "",
-    planId: diagnosis.planId,
-    planLabel: diagnosis.planLabel,
-    clinicalDx: diagnosis.clinicalDx,
-    dxValue: diagnosis.dxValue,
-    price: diagnosis.price,
-    status: diagnosis.status,
-  };
-
-  const rec = addRecord(newRecord) as DiagnosisRecord;
-  recomputeToothState(patientId, toothNo);
-  return rec;
-}
-
-export function deleteRecord(
-  patientId: string,
-  toothNo: number,
-  recordId: string,
-): boolean {
-  const ok = removeRecord(recordId);
-  if (ok) recomputeToothState(patientId, toothNo);
-  return ok;
-}
-
-// ═══════════════════════════════════════════════
-// پریست‌های وضعیت (Status Extras)
-// ═══════════════════════════════════════════════
-
-export function applyStatusExtraPreset(
-  _patientId: string,
-  extra: StatusExtra,
-): void {
-  if (extra.type === "span") {
-    for (const toothNo of extra.teeth) {
-      setToothStateAndRender(toothNo, {
-        restorationType: "crown",
-        restorationMaterial: extra.material,
-        toothSubstrate: "crownprep",
-        bridgePillar: true,
-      });
-    }
-  } else if (extra.type === "arch-bridge") {
-    const archTeeth =
-      extra.arch === "upper"
-        ? STATUS_EXTRAS.arches.upper
-        : STATUS_EXTRAS.arches.lower;
-    for (const toothNo of archTeeth) {
-      setToothStateAndRender(toothNo, {
-        restorationType: "crown",
-        restorationMaterial: extra.material,
-        toothSubstrate: "crownprep",
-        bridgePillar: true,
-      });
-    }
-  } else if (extra.type === "partial-removable") {
-    const archTeeth =
-      extra.arch === "upper"
-        ? STATUS_EXTRAS.arches.upper
-        : STATUS_EXTRAS.arches.lower;
-    for (const toothNo of archTeeth) {
-      setToothStateAndRender(toothNo, {
-        prosthesis: "removable-partial",
-      });
-    }
-  } else if (extra.type === "full-removable") {
-    const archTeeth =
-      extra.arch === "upper"
-        ? STATUS_EXTRAS.arches.upper
-        : STATUS_EXTRAS.arches.lower;
-    for (const toothNo of archTeeth) {
-      setToothStateAndRender(toothNo, {
-        prosthesis: "removable-full",
-      });
-    }
-  } else if (extra.type === "bar-denture") {
-    for (const toothNo of extra.implants) {
-      setToothStateAndRender(toothNo, {
-        toothSelection: "implant",
-        prosthesis: "bar-denture",
-      });
-    }
-    for (const toothNo of extra.missing) {
-      setToothStateAndRender(toothNo, {
-        toothSelection: "none",
-        prosthesis: "bar-denture",
-      });
-    }
-  }
-}
-
-
-// ═══════════════════════════════════════════════
-// توابع جدید برای Plan/Session
-// ═══════════════════════════════════════════════
-
-/** گرفتن همه‌ی طرح‌های درمانی (planned) یک بیمار */
-export function getPlannedRecordsForPatient(
-  patientId: string,
-): OdontogramRecord[] {
-  return getRecordsForPatient(patientId)
-    .filter((r): r is TreatmentRecord | DiagnosisRecord => {
-      return (
-        (r.kind === "treatment" || r.kind === "diagnosis") &&
-        r.status === "planned"
-      );
-    })
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-/** گرفتن درمان‌های یک جلسه */
-export function getRecordsForSession(
-  patientId: string,
-  sessionId: string,
-): OdontogramRecord[] {
-  return getRecordsForPatient(patientId).filter((r) => {
-    if (r.kind === "treatment" || r.kind === "diagnosis") {
-      return r.sessionId === sessionId;
-    }
-    return false;
-  });
-}
-
-/** گرفتن درمان‌های یک طرح */
-export function getRecordsForPlan(
+export function getNextSessionNumberForPlan(
   patientId: string,
   planId: string,
-): OdontogramRecord[] {
-  return getRecordsForPatient(patientId).filter((r) => {
-    if (r.kind === "treatment" || r.kind === "diagnosis") {
-      return r.planId === planId;
-    }
-    return false;
-  });
+): number {
+  const records = getRecordsForPatient(patientId).filter(
+    (r): r is TreatmentRecord =>
+      r.kind === "treatment" && r.planId === planId && !!r.sessionId,
+  );
+  const sessions = getSessionsForPlan(planId);
+  const maxFromSessions =
+    sessions.length > 0
+      ? Math.max(...sessions.map((s) => s.sessionNumber))
+      : 0;
+  const maxFromRecords = records.length;
+  return Math.max(maxFromRecords, maxFromSessions) + 1;
 }
 
-/** تبدیل یک طرح به انجام‌شده */
-export function markAsDone(
-  patientId: string,
-  toothNo: number,
-  recordId: string,
-): boolean {
-  const records = getRecordsForTooth(patientId, toothNo);
-  const rec = records.find((r) => r.id === recordId);
-  if (!rec) return false;
-  if (rec.kind !== "treatment" && rec.kind !== "diagnosis") return false;
-
-  rec.status = "done";
-  rec.date = new Date().toISOString().slice(0, 10);
-  recomputeToothState(patientId, toothNo);
-  return true;
-}
-
-/** برگرداندن به طرح */
-export function markAsPlanned(
-  patientId: string,
-  toothNo: number,
-  recordId: string,
-): boolean {
-  const records = getRecordsForTooth(patientId, toothNo);
-  const rec = records.find((r) => r.id === recordId);
-  if (!rec) return false;
-  if (rec.kind !== "treatment" && rec.kind !== "diagnosis") return false;
-
-  rec.status = "planned";
-  recomputeToothState(patientId, toothNo);
-  return true;
-}
 // ═══════════════════════════════════════════════
 // Re-export
 // ═══════════════════════════════════════════════
-export { deriveToothPatch, derivePatchFromRecords, treatmentToPatchPreview };
+
+export { derivePatchFromRecords, treatmentToPatchPreview };
 export type { OdontogramRecord, StatusRecord, TreatmentRecord, DiagnosisRecord };

@@ -23,6 +23,8 @@ export interface StatusRecord extends BaseRecord {
   value: unknown;
 }
 
+// src/treatment/treatmentStore.ts
+
 export interface TreatmentRecord extends BaseRecord {
   kind: "treatment";
   treatmentId: string;
@@ -32,35 +34,60 @@ export interface TreatmentRecord extends BaseRecord {
   material?: string;
   price: number;
   status: "done" | "planned" | "cancelled";
-  // ⭐ فیلدهای جدید — همه optional
-  planId?: string;
-  sessionId?: string; 
-  planTitle?: string;
-  sessionNumber?: number;
-  sessionTitle?: string;
-  sessionDate?: string;
-  sessionTime?: string;
+
+  // ⭐ طرح و جلسه
+  planId?: string;          // به کدوم طرح مربوطه
+  planTitle?: string;       // عنوان طرح (کش می‌شه)
+  sessionId?: string;       // به کدوم جلسه مربوطه
+  sessionDate?: string;     // تاریخ جلسه
+  sessionTime?: string;     // ساعت جلسه
+
+  // ⭐ تیم
   doctorId?: string;
   assistantId?: string;
   time?: string;
+
+  // ⭐ مالی
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  discountAmount?: number;
+
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
+  insuranceAmount?: number;
+  patientAmount?: number;
+
+  // ⭐ رادیوگرافی
+  radiographId?: string;    // ⭐ مفرد (نه جمع)
 }
 
 export interface DiagnosisRecord extends BaseRecord {
   kind: "diagnosis";
   planId?: string;
+  sessionId?: string;       // ⭐ جدید
   planLabel?: string;
   clinicalDx?: string;
   dxValue?: string;
   price: number;
   status: "done" | "planned" | "cancelled";
-  // ⭐ فیلدهای جدید — همه optional
-  sessionId?: string;
-  sessionNumber?: number;
-  sessionTitle?: string;
-  sessionDate?: string;
+
   doctorId?: string;
   assistantId?: string;
   time?: string;
+
+  // مالی
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  discountAmount?: number;
+
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
+  insuranceAmount?: number;
+  patientAmount?: number;
 }
 
 

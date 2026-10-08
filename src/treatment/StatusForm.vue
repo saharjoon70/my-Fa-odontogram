@@ -8,9 +8,12 @@ import {
   type StatusSelect,
 } from "./statusGroups";
 import { isItemChecked, getRadioValue } from "./statusToState";
-import { submitStatus, unsubmitStatus } from "./applyTreatment";
+import {
+  submitStatus,
+  unsubmitStatus,
+  applyStatusExtraPreset,
+} from "./applyTreatment";
 import { STATUS_EXTRAS } from "./status_extras";
-import { applyStatusExtraPreset } from "./applyTreatment";
 import FillingPanel from "./FillingPanel.vue";
 
 const props = defineProps<{
@@ -24,13 +27,14 @@ const emit = defineEmits<{
 }>();
 
 const activeGroup = ref<StatusGroup>("presence");
-
-// ⭐ پریست افزودن سریع
 const selectedExtraId = ref<string>("");
 
+// ⭐ اضافه کردن طرح درمان
 function applyExtra() {
   if (!selectedExtraId.value) return;
-  const extra = STATUS_EXTRAS.options.find((o) => o.id === selectedExtraId.value);
+  const extra = STATUS_EXTRAS.options.find(
+    (o) => o.id === selectedExtraId.value,
+  );
   if (!extra) return;
   applyStatusExtraPreset(props.patientId, extra);
   selectedExtraId.value = "";
@@ -52,7 +56,6 @@ const currentGroup = computed(() =>
   applicableGroups.value.find((g) => g.id === activeGroup.value),
 );
 
-// ⭐ آیتم‌های فیلترشده
 const applicableItems = computed(() => {
   const group = currentGroup.value;
   if (!group?.items) return [];
@@ -63,7 +66,6 @@ const applicableItems = computed(() => {
   });
 });
 
-// ⭐ رادیوهای فیلترشده
 const applicableRadios = computed(() => {
   const group = currentGroup.value;
   if (!group?.radios) return [];
@@ -74,7 +76,6 @@ const applicableRadios = computed(() => {
   });
 });
 
-// ⭐ SELECTهای فیلترشده
 const applicableSelects = computed(() => {
   const group = currentGroup.value;
   if (!group?.selects) return [];
@@ -114,11 +115,15 @@ watch(
   { deep: true },
 );
 
-watch(applicableGroups, (groups) => {
-  if (!groups.find((g) => g.id === activeGroup.value)) {
-    activeGroup.value = groups[0]?.id ?? "presence";
-  }
-}, { immediate: true });
+watch(
+  applicableGroups,
+  (groups) => {
+    if (!groups.find((g) => g.id === activeGroup.value)) {
+      activeGroup.value = groups[0]?.id ?? "presence";
+    }
+  },
+  { immediate: true },
+);
 
 function onToggleCheckbox(group: string, item: StatusItem, ev: Event) {
   const checked = (ev.target as HTMLInputElement).checked;
@@ -209,7 +214,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         </div>
       </div>
 
-      <!-- ⭐ اگر surfaceCross باشد، FillingPanel -->
+      <!-- Surface Cross / FillingPanel -->
       <FillingPanel
         v-if="currentGroup.surfaceCross && props.toothState"
         :patient-id="patientId"
@@ -218,7 +223,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         @change="emit('change')"
       />
 
-      <!-- ⭐ Select ها (اگر surfaceCross نیست) -->
+      <!-- Select ها -->
       <div
         v-if="!currentGroup.surfaceCross && applicableSelects.length"
         class="select-section"
@@ -244,7 +249,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         </label>
       </div>
 
-      <!-- ⭐ Checkbox ها (اگر surfaceCross نیست) -->
+      <!-- Checkbox ها -->
       <div
         v-if="!currentGroup.surfaceCross && applicableItems.length"
         class="check-list"
@@ -264,7 +269,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         </label>
       </div>
 
-      <!-- ⭐ افزودن سریع — فقط در گروه «وضعیت دندان» -->
+      <!-- افزودن سریع -->
       <div
         v-if="activeGroup === 'presence'"
         class="status-extras"
@@ -492,7 +497,6 @@ function isChecked(group: string, item: StatusItem): boolean {
   font-size: 13px;
 }
 
-/* ⭐ Status Extras */
 .status-extras {
   margin-top: 12px;
   padding-top: 12px;

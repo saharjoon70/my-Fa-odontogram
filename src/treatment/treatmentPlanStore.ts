@@ -1,5 +1,5 @@
 // src/treatment/treatmentPlanStore.ts
-// Store مستقل برای طرح درمان، جلسات، تیم درمان
+// Store برای طرح درمان، جلسات، تیم درمان
 
 import { reactive, computed } from "vue";
 
@@ -28,9 +28,8 @@ export interface TreatmentPlan {
   endDate?: string;
   status: PlanStatus;
   toothNos: number[];
+  doctorId?: string;
   color?: string;
-  /** ⭐ ترتیب نمایش */
-  orderIndex: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -38,11 +37,8 @@ export interface TreatmentPlan {
 export interface TreatmentSession {
   id: string;
   patientId: string;
-  planId?: string;
-  /** ⭐ شماره جلسه در طرح (۱، ۲، ۳، ...) */
+  planId: string;           // ⭐ اجباری — هر جلسه به یه طرح وصل میشه
   sessionNumber: number;
-  /** ⭐ ترتیب نمایش */
-  orderIndex: number;
   title: string;
   sessionDate: string;
   sessionTime?: string;
@@ -89,14 +85,12 @@ function uid(prefix: string): string {
 // ═══════════════════════════════════════════════
 
 export function addPlan(
-  plan: Omit<TreatmentPlan, "id" | "createdAt" | "updatedAt" | "orderIndex">,
+  plan: Omit<TreatmentPlan, "id" | "createdAt" | "updatedAt">,
 ): TreatmentPlan {
   const now = Date.now();
-  const maxOrder = planStore.plans.reduce((max, p) => Math.max(max, p.orderIndex), 0);
   const newPlan: TreatmentPlan = {
     ...plan,
-    id: uid("plan"),
-    orderIndex: maxOrder + 1,
+    id: `plan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     createdAt: now,
     updatedAt: now,
   };
@@ -104,10 +98,20 @@ export function addPlan(
   return newPlan;
 }
 
-export function updatePlan(planId: string, patch: Partial<TreatmentPlan>): boolean {
+export function getPlansForPatient(patientId: string): TreatmentPlan[] {
+  return planStore.plans.filter((p) => p.patientId === patientId);
+}
+export function updatePlan(
+  planId: string,
+  patch: Partial<TreatmentPlan>,
+): boolean {
   const idx = planStore.plans.findIndex((p) => p.id === planId);
   if (idx < 0) return false;
-  planStore.plans[idx] = { ...planStore.plans[idx], ...patch, updatedAt: Date.now() };
+  planStore.plans[idx] = {
+    ...planStore.plans[idx],
+    ...patch,
+    updatedAt: Date.now(),
+  };
   return true;
 }
 
@@ -115,7 +119,6 @@ export function removePlan(planId: string): boolean {
   const idx = planStore.plans.findIndex((p) => p.id === planId);
   if (idx < 0) return false;
   planStore.plans.splice(idx, 1);
-  // جلسات مربوطه هم حذف بشن
   planStore.sessions = planStore.sessions.filter((s) => s.planId !== planId);
   return true;
 }
@@ -124,33 +127,25 @@ export function getPlanById(planId: string): TreatmentPlan | undefined {
   return planStore.plans.find((p) => p.id === planId);
 }
 
-export function getPlansForPatient(patientId: string): TreatmentPlan[] {
-  return planStore.plans
-    .filter((p) => p.patientId === patientId)
-    .sort((a, b) => a.orderIndex - b.orderIndex);
-}
+
 
 // ═══════════════════════════════════════════════
 // Sessions — CRUD
 // ═══════════════════════════════════════════════
 
-/** ⭐ گرفتن شماره جلسه بعدی برای یک طرح */
 export function getNextSessionNumber(planId: string): number {
   const sessions = planStore.sessions.filter((s) => s.planId === planId);
   if (sessions.length === 0) return 1;
-  const max = sessions.reduce((max, s) => Math.max(max, s.sessionNumber), 0);
-  return max + 1;
+  return Math.max(...sessions.map((s) => s.sessionNumber)) + 1;
 }
 
 export function addSession(
-  session: Omit<TreatmentSession, "id" | "createdAt" | "updatedAt" | "orderIndex">,
+  session: Omit<TreatmentSession, "id" | "createdAt" | "updatedAt">,
 ): TreatmentSession {
   const now = Date.now();
-  const maxOrder = planStore.sessions.reduce((max, s) => Math.max(max, s.orderIndex), 0);
   const newSession: TreatmentSession = {
     ...session,
     id: uid("sess"),
-    orderIndex: maxOrder + 1,
     createdAt: now,
     updatedAt: now,
   };
@@ -158,10 +153,17 @@ export function addSession(
   return newSession;
 }
 
-export function updateSession(sessionId: string, patch: Partial<TreatmentSession>): boolean {
+export function updateSession(
+  sessionId: string,
+  patch: Partial<TreatmentSession>,
+): boolean {
   const idx = planStore.sessions.findIndex((s) => s.id === sessionId);
   if (idx < 0) return false;
-  planStore.sessions[idx] = { ...planStore.sessions[idx], ...patch, updatedAt: Date.now() };
+  planStore.sessions[idx] = {
+    ...planStore.sessions[idx],
+    ...patch,
+    updatedAt: Date.now(),
+  };
   return true;
 }
 
@@ -197,7 +199,9 @@ export function getUpcomingSessions(patientId: string): TreatmentSession[] {
 
 export function getTodaySessions(patientId: string): TreatmentSession[] {
   const today = new Date().toISOString().slice(0, 10);
-  return getSessionsForPatient(patientId).filter((s) => s.sessionDate === today);
+  return getSessionsForPatient(patientId).filter(
+    (s) => s.sessionDate === today,
+  );
 }
 
 export function getPastSessions(patientId: string): TreatmentSession[] {
