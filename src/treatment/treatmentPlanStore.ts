@@ -37,7 +37,7 @@ export interface TreatmentPlan {
 export interface TreatmentSession {
   id: string;
   patientId: string;
-  planId: string;           // ⭐ اجباری — هر جلسه به یه طرح وصل میشه
+  planId?: string;
   sessionNumber: number;
   title: string;
   sessionDate: string;
@@ -46,10 +46,16 @@ export interface TreatmentSession {
   doctorId?: string;
   assistantId?: string;
   note?: string;
+  // ⭐ این‌ها
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
   createdAt: number;
   updatedAt: number;
 }
-
 // ═══════════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════════

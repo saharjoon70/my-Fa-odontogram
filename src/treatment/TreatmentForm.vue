@@ -13,7 +13,7 @@ import { getTreatmentIcon } from "./treatmentIcons";
 import {
   previewTreatmentItem,
   resetToothToStoredState,
-  calculateFinancials,
+
 } from "./applyTreatment";
 import {
   getPlansForPatient,
@@ -59,21 +59,18 @@ const emit = defineEmits<{
       // ⭐ Session
       sessionMode: "auto" | "existing" | "new";
       sessionId?: string;
-      sessionNumber?: number;
       sessionTitle?: string;
       doctorId?: string;
       assistantId?: string;
       date: string;
       time: string;
+      // ⭐ مالی جلسه (روی کل جلسه)
       discountType?: "percent" | "amount";
       discountValue?: number;
       discountReason?: string;
-      discountAmount?: number;
       insuranceType?: "percent" | "amount" | "none";
       insuranceValue?: number;
       insuranceName?: string;
-      insuranceAmount?: number;
-      patientAmount?: number;
     },
   ];
 }>();
@@ -108,7 +105,7 @@ const newSessionTitle = ref("");
 const doctorId = ref("");
 const assistantId = ref("");
 
-// ═══ مالی ═══
+// ═══ مالی جلسه ═══
 const hasDiscount = ref(false);
 const discountType = ref<"percent" | "amount">("percent");
 const discountValue = ref(0);
@@ -177,10 +174,9 @@ const insuranceProviders = computed(() => getInsuranceProviders());
 const doctors = computed(() => getDoctors());
 const assistants = computed(() => getAssistants());
 
-// ⭐ بارگذاری آخرین انتخاب‌ها (بعد از تعریف همه‌ی computedها)
+// ⭐ بارگذاری آخرین انتخاب‌ها
 const lastSel = getLastSelection(props.patientId);
 sessionMode.value = lastSel.sessionMode;
-// بررسی کن جلسه هنوز وجود دارد
 if (
   lastSel.selectedSessionId &&
   allPatientSessions.value.some((s) => s.id === lastSel.selectedSessionId)
@@ -190,7 +186,6 @@ if (
   selectedSessionId.value = "";
   if (sessionMode.value === "existing") sessionMode.value = "auto";
 }
-// بررسی کن طرح هنوز وجود دارد
 if (
   lastSel.selectedPlanId &&
   allPlans.value.some((p) => p.id === lastSel.selectedPlanId)
@@ -215,32 +210,7 @@ const canSubmit = computed(() => {
   return true;
 });
 
-const financials = computed(() =>
-  calculateFinancials({
-    price: price.value,
-    discountType:
-      mode.value === "done" && hasDiscount.value
-        ? discountType.value
-        : undefined,
-    discountValue:
-      mode.value === "done" && hasDiscount.value
-        ? discountValue.value
-        : undefined,
-    insuranceType:
-      mode.value === "done" && hasInsurance.value
-        ? insuranceType.value
-        : "none",
-    insuranceValue:
-      mode.value === "done" && hasInsurance.value
-        ? insuranceValue.value
-        : undefined,
-  }),
-);
 
-const discountAmount = computed(() => financials.value.discountAmount);
-const afterDiscount = computed(() => financials.value.afterDiscount);
-const insuranceAmount = computed(() => financials.value.insuranceAmount);
-const patientAmount = computed(() => financials.value.patientAmount);
 
 // ═══ Preview ═══
 function refreshPreview() {
@@ -260,10 +230,41 @@ function refreshPreview() {
 watch([selected, surfaces, material], refreshPreview, { deep: true });
 watch(() => [...props.toothNos], () => refreshPreview(), { immediate: true });
 
-// ⭐ وقتی جلسه انتخاب شد، طرحش را پیش‌فرض کن
+// ⭐ وقتی جلسه انتخاب شد، طرحش و تخفیف/بیمه‌اش را load کن
 watch(selectedSession, (sess) => {
-  if (sess?.planId && sess.planId !== selectedPlanId.value) {
+  if (!sess) return;
+  // طرح
+  if (sess.planId && sess.planId !== selectedPlanId.value) {
     selectedPlanId.value = sess.planId;
+  }
+  // تخفیف/بیمه از جلسه
+  if (sess.discountType && sess.discountValue) {
+    hasDiscount.value = true;
+    discountType.value = sess.discountType;
+    discountValue.value = sess.discountValue;
+    discountReason.value = sess.discountReason ?? "";
+    // اگر preset مطابقت داشت، آن را فعال کن
+    const matchPreset = DISCOUNT_PRESETS.find(
+      (p) => p.type === sess.discountType && p.value === sess.discountValue,
+    );
+    selectedDiscountPreset.value = matchPreset?.id ?? "custom";
+  } else {
+    hasDiscount.value = false;
+    discountType.value = "percent";
+    discountValue.value = 0;
+    discountReason.value = "";
+    selectedDiscountPreset.value = "none";
+  }
+  if (sess.insuranceType && sess.insuranceType !== "none" && sess.insuranceValue) {
+    hasInsurance.value = true;
+    insuranceType.value = sess.insuranceType === "amount" ? "amount" : "percent";
+    insuranceValue.value = sess.insuranceValue;
+    insuranceName.value = sess.insuranceName ?? "";
+  } else {
+    hasInsurance.value = false;
+    insuranceType.value = "percent";
+    insuranceValue.value = 0;
+    insuranceName.value = "";
   }
 });
 
@@ -273,10 +274,8 @@ watch(mode, (newMode) => {
     hasInsurance.value = false;
     assistantId.value = "";
     newSessionTitle.value = "";
-    // ⭐ طرح/جلسه را دست نزن (تا وقتی برگشتی، حفظ شوند)
   } else {
     newPlanTitle.value = "";
-    // ⭐ وقتی برگشت به done، از حافظه بازیابی کن
     const last = getLastSelection(props.patientId);
     sessionMode.value = last.sessionMode;
     selectedSessionId.value = last.selectedSessionId;
@@ -416,12 +415,32 @@ function onSubmit() {
     sessPayload.sessionTitle = newSessionTitle.value.trim();
   }
 
-  // ⭐ ذخیره‌ی آخرین انتخاب‌ها برای دفعه‌ی بعد
+  // ⭐ ذخیره‌ی آخرین انتخاب‌ها
   saveLastSelection(props.patientId, {
     sessionMode: sessionMode.value,
     selectedSessionId: selectedSessionId.value,
     selectedPlanId: selectedPlanId.value,
   });
+
+  // ⭐ مالی جلسه (فقط در mode=done)
+const financialPayload: {
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
+} =
+  mode.value === "done"
+    ? {
+        discountType: hasDiscount.value ? discountType.value : undefined,
+        discountValue: hasDiscount.value ? discountValue.value : undefined,
+        discountReason: hasDiscount.value ? discountReason.value : undefined,
+        insuranceType: hasInsurance.value ? insuranceType.value : "none",
+        insuranceValue: hasInsurance.value ? insuranceValue.value : undefined,
+        insuranceName: hasInsurance.value ? insuranceName.value : undefined,
+      }
+    : {};
 
   emit("submit", {
     treatmentId: selected.value.id,
@@ -443,37 +462,11 @@ function onSubmit() {
       mode.value === "done" ? assistantId.value || undefined : undefined,
     date: date.value,
     time: time.value,
-    discountType:
-      mode.value === "done" && hasDiscount.value
-        ? discountType.value
-        : undefined,
-    discountValue:
-      mode.value === "done" && hasDiscount.value
-        ? discountValue.value
-        : undefined,
-    discountReason:
-      mode.value === "done" && hasDiscount.value
-        ? discountReason.value
-        : undefined,
-    discountAmount: mode.value === "done" ? discountAmount.value : undefined,
-    insuranceType:
-      mode.value === "done" && hasInsurance.value
-        ? insuranceType.value
-        : "none",
-    insuranceValue:
-      mode.value === "done" && hasInsurance.value
-        ? insuranceValue.value
-        : undefined,
-    insuranceName:
-      mode.value === "done" && hasInsurance.value
-        ? insuranceName.value
-        : undefined,
-    insuranceAmount:
-      mode.value === "done" ? insuranceAmount.value : undefined,
-    patientAmount: mode.value === "done" ? patientAmount.value : undefined,
+    // ⭐ مالی جلسه
+    ...financialPayload,
   });
 
-  // Reset
+  // Reset — فقط درمان
   selected.value = null;
   surfaces.value = [];
   material.value = "";
@@ -481,14 +474,7 @@ function onSubmit() {
   note.value = "";
   newPlanTitle.value = "";
   newSessionTitle.value = "";
-  // ⭐ sessionMode / selectedSessionId / selectedPlanId را نگه دار
-  hasDiscount.value = false;
-  discountValue.value = 0;
-  discountReason.value = "";
-  selectedDiscountPreset.value = "none";
-  hasInsurance.value = false;
-  insuranceValue.value = 0;
-  insuranceName.value = "";
+  // ⭐ sessionMode / selectedSessionId / selectedPlanId / تخفیف / بیمه را نگه دار
 }
 
 function onCancel() {
@@ -499,10 +485,17 @@ function onCancel() {
   note.value = "";
   newPlanTitle.value = "";
   newSessionTitle.value = "";
-  // ⭐ در cancel، session/plan را هم پاک کن (چون کاربر انصراف داده)
+  // ⭐ در cancel، session/plan/تخفیف/بیمه را هم پاک کن
   sessionMode.value = "auto";
   selectedSessionId.value = "";
   selectedPlanId.value = "";
+  hasDiscount.value = false;
+  discountValue.value = 0;
+  discountReason.value = "";
+  selectedDiscountPreset.value = "none";
+  hasInsurance.value = false;
+  insuranceValue.value = 0;
+  insuranceName.value = "";
   for (const toothNo of props.toothNos) {
     resetToothToStoredState(props.patientId, toothNo);
   }
@@ -690,7 +683,7 @@ function onCancel() {
           />
         </div>
 
-        <!-- ⭐ طرح درمان (اختیاری) — بعد از جلسه -->
+        <!-- ⭐ طرح درمان (اختیاری) -->
         <div class="section-title">📋 طرح درمان (اختیاری)</div>
 
         <div class="detail-row">
@@ -726,17 +719,38 @@ function onCancel() {
         />
       </template>
 
-      <!-- مالی -->
-      <template v-if="mode === 'done'">
-        <div class="section-title">💰 مالی</div>
-        <div class="detail-row">
-          <span>قیمت (تومان)</span>
+      <!-- Note -->
+      <div class="detail-row detail-row-full">
+        <span>یادداشت</span>
+        <textarea v-model="note" rows="2" placeholder="اختیاری..."></textarea>
+      </div>
+    </div>
+
+    <!-- ⭐ مالی جلسه — بیرون از v-if="selected" -->
+    <template v-if="mode === 'done'">
+      <div class="financial-section">
+        <div class="financial-header">
+          💰 مالی — برای کل جلسه
+          <span class="financial-hint">
+            (تخفیف و بیمه روی مجموع کل جلسه اعمال می‌شود)
+          </span>
+        </div>
+
+        <!-- قیمت این درمان -->
+        <div v-if="selected" class="detail-row">
+          <span>قیمت این درمان (تومان)</span>
           <input v-model.number="price" type="number" min="0" step="50000" />
         </div>
+        <div v-else class="financial-empty">
+          (قیمت این درمان: هنوز سرویسی انتخاب نشده)
+        </div>
+
+        <!-- ⭐ تخفیف کل جلسه -->
+        <div class="subsection-label">🏷️ تخفیف کل جلسه</div>
         <div class="checkbox-row">
           <label class="checkbox-label">
             <input v-model="hasDiscount" type="checkbox" />
-            <span>تخفیف دارد</span>
+            <span>این جلسه تخفیف دارد</span>
           </label>
         </div>
         <div v-if="hasDiscount" class="sub-panel">
@@ -763,10 +777,13 @@ function onCancel() {
             <input v-model.number="discountValue" type="number" min="0" />
           </div>
         </div>
+
+        <!-- ⭐ بیمه کل جلسه -->
+        <div class="subsection-label">🏥 بیمه کل جلسه</div>
         <div class="checkbox-row">
           <label class="checkbox-label">
             <input v-model="hasInsurance" type="checkbox" />
-            <span>بیمه دارد</span>
+            <span>این جلسه بیمه دارد</span>
           </label>
         </div>
         <div v-if="hasInsurance" class="sub-panel">
@@ -793,61 +810,38 @@ function onCancel() {
             <input v-model.number="insuranceValue" type="number" min="0" />
           </div>
         </div>
-        <div class="financial-summary">
-          <div class="summary-row">
-            <span>مبلغ اصلی:</span>
-            <span>{{ price.toLocaleString("fa-IR") }} ت</span>
-          </div>
-          <div v-if="discountAmount > 0" class="summary-row discount">
-            <span>تخفیف:</span>
-            <span>- {{ discountAmount.toLocaleString("fa-IR") }} ت</span>
-          </div>
-          <div class="summary-row after-discount">
-            <span>بعد از تخفیف:</span>
-            <span>{{ afterDiscount.toLocaleString("fa-IR") }} ت</span>
-          </div>
-          <div v-if="insuranceAmount > 0" class="summary-row insurance">
-            <span>سهم بیمه:</span>
-            <span>{{ insuranceAmount.toLocaleString("fa-IR") }} ت</span>
-          </div>
-          <div class="summary-row patient total">
-            <span>سهم بیمار:</span>
-            <span>{{ patientAmount.toLocaleString("fa-IR") }} ت</span>
-          </div>
-        </div>
-      </template>
-
-      <!-- Note -->
-      <div class="detail-row detail-row-full">
-        <span>یادداشت</span>
-        <textarea v-model="note" rows="2" placeholder="اختیاری..."></textarea>
       </div>
+    </template>
 
-      <!-- Actions -->
-      <div class="form-actions">
-        <button class="btn-primary" :disabled="!canSubmit" @click="onSubmit">
-          {{ mode === "done" ? "✅ ثبت درمان" : "📋 ثبت طرح درمان" }}
-        </button>
-        <button class="btn-secondary" @click="onCancel">انصراف</button>
-      </div>
-
-      <div v-if="!canSubmit" class="hint">
-        <span v-if="selected.needsSurface && surfaces.length === 0">
-          ⚠️ حداقل یک سطح انتخاب کنید
-        </span>
-        <span v-else-if="selected.needsMaterial && !material">
-          ⚠️ جنس را انتخاب کنید
-        </span>
-        <span v-else-if="mode === 'planned' && !newPlanTitle.trim()">
-          ⚠️ عنوان طرح را وارد کنید
-        </span>
-        <span v-else-if="mode === 'done' && sessionMode === 'existing' && !selectedSessionId">
-          ⚠️ یک جلسه انتخاب کنید یا حالت «جلسه جدید خودکار» را بزنید
-        </span>
-      </div>
+    <!-- Actions -->
+    <div v-if="selected || mode === 'planned'" class="form-actions">
+      <button class="btn-primary" :disabled="!canSubmit" @click="onSubmit">
+        {{ mode === "done" ? "✅ ثبت درمان" : "📋 ثبت طرح درمان" }}
+      </button>
+      <button class="btn-secondary" @click="onCancel">انصراف</button>
     </div>
 
-    <div v-else class="empty-hint">👆 یک سرویس از بالا انتخاب کنید</div>
+    <div v-if="selected && !canSubmit" class="hint">
+      <span v-if="selected.needsSurface && surfaces.length === 0">
+        ⚠️ حداقل یک سطح انتخاب کنید
+      </span>
+      <span v-else-if="selected.needsMaterial && !material">
+        ⚠️ جنس را انتخاب کنید
+      </span>
+      <span v-else-if="mode === 'planned' && !newPlanTitle.trim()">
+        ⚠️ عنوان طرح را وارد کنید
+      </span>
+      <span v-else-if="mode === 'done' && sessionMode === 'existing' && !selectedSessionId">
+        ⚠️ یک جلسه انتخاب کنید یا حالت «جلسه جدید خودکار» را بزنید
+      </span>
+    </div>
+
+    <div v-if="!selected && mode === 'done'" class="empty-hint">
+      👆 یک سرویس از بالا انتخاب کنید (تخفیف/بیمه‌ی جلسه را می‌توانید همین الان تنظیم کنید)
+    </div>
+    <div v-if="!selected && mode === 'planned'" class="empty-hint">
+      👆 یک سرویس از بالا انتخاب کنید
+    </div>
   </div>
 </template>
 
@@ -909,13 +903,6 @@ function onCancel() {
 .radio-chip:hover { background: #f0f9ff; border-color: #93c5fd; }
 .radio-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
 .required { color: #dc2626; }
-.financial-summary { display: flex; flex-direction: column; gap: 4px; padding: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-top: 4px; }
-.summary-row { display: flex; justify-content: space-between; font-size: 12px; color: #374151; }
-.summary-row span:last-child { font-weight: 600; }
-.summary-row.discount { color: #dc2626; }
-.summary-row.insurance { color: #2563eb; }
-.summary-row.after-discount { border-top: 1px dashed #d1d5db; padding-top: 4px; margin-top: 4px; }
-.summary-row.patient.total { border-top: 2px solid #16a34a; padding-top: 6px; margin-top: 4px; font-size: 13px; color: #065f46; }
 .form-actions { display: flex; gap: 8px; margin-top: 4px; }
 .btn-primary { flex: 1; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
 .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
@@ -923,11 +910,54 @@ function onCancel() {
 .btn-secondary { padding: 10px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; }
 .btn-secondary:hover { background: #e5e7eb; }
 .hint { text-align: center; font-size: 11px; color: #f59e0b; padding: 4px; }
-.empty-hint { text-align: center; color: #999; padding: 30px 20px; font-size: 13px; }
+.empty-hint { text-align: center; color: #999; padding: 20px; font-size: 13px; }
 .session-plan-info { padding: 8px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11.5px; }
 .info-line { color: #1e40af; }
 .info-line strong { font-weight: 700; }
 .info-line .muted { font-weight: 400; color: #6b7280; }
 .info-line .no-plan { color: #6b7280; font-weight: 500; }
 .plan-session-count { padding: 6px 10px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: 11px; color: #92400e; }
+
+/* ⭐ بخش مالی جلسه (بیرون از v-if="selected") */
+.financial-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+}
+.financial-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #065f46;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #86efac;
+}
+.financial-hint {
+  font-size: 10px;
+  font-weight: 400;
+  color: #16a34a;
+}
+.subsection-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+.financial-empty {
+  font-size: 11px;
+  color: #9ca3af;
+  padding: 6px;
+  background: #fff;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  text-align: center;
+}
 </style>

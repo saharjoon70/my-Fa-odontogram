@@ -9,7 +9,6 @@ import {
   getPlanById,
   getSessionCountForPlan,
 } from "./treatmentPlanStore";
-import { calculateFinancials } from "./applyTreatment";
 import RadiographDisplay from "./RadiographDisplay.vue";
 import SessionModal from "./SessionModal.vue";
 
@@ -30,6 +29,7 @@ function openEdit(recordId: string) {
 function onEditSaved() {
   refresh();
 }
+
 const expandedSessionKey = ref<string | null>(null);
 const filterMode = ref<"all" | "upcoming" | "today" | "past">("all");
 const showRadiographs = ref(false);
@@ -66,7 +66,7 @@ interface SessionTreatment {
   label: string;
   doctorName: string;
   assistantName: string;
-  financials: ReturnType<typeof calculateFinancials>;
+  price: number;
 }
 
 interface SessionView {
@@ -78,20 +78,25 @@ interface SessionView {
   status: "scheduled" | "done" | "cancelled";
   planId?: string;
   planTitle?: string;
-  /** ⭐ شماره‌ی جلسه در طرح (فقط اگر طرح دارد) */
   sessionNumberInPlan?: number;
-  /** ⭐ تعداد کل جلسات طرح (فقط اگر طرح دارد) */
   planTotalSessions?: number;
   doctorId?: string;
   assistantId?: string;
   doctorName: string;
   assistantName: string;
   records: SessionTreatment[];
+  // ⭐ مالی جلسه
   totalPrice: number;
-  totalDiscount: number;
-  totalInsurance: number;
-  totalPatient: number;
-  totalAfterDiscount: number;
+  discountAmount: number;
+  afterDiscount: number;
+  insuranceAmount: number;
+  patientAmount: number;
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
   doneCount: number;
   plannedCount: number;
   progress: number;
@@ -112,29 +117,33 @@ const allSessions = computed<SessionView[]>(() => {
         return (r as TreatmentRecord).sessionId === sess.id;
       }) as (TreatmentRecord | DiagnosisRecord)[];
 
-      // ⭐ مالی
-      let totalPrice = 0;
-      let totalDiscount = 0;
-      let totalInsurance = 0;
-      let totalPatient = 0;
-      let totalAfterDiscount = 0;
+      // ⭐ جمع قیمت‌ها
+      const totalPrice = records.reduce(
+        (sum, r) => sum + ((r as TreatmentRecord).price || 0),
+        0,
+      );
 
+      // ⭐ تخفیف (از session)
+      let discountAmount = 0;
+      if (sess.discountType === "percent" && sess.discountValue) {
+        discountAmount = Math.round((totalPrice * sess.discountValue) / 100);
+      } else if (sess.discountType === "amount" && sess.discountValue) {
+        discountAmount = sess.discountValue;
+      }
+      const afterDiscount = Math.max(0, totalPrice - discountAmount);
+
+      // ⭐ بیمه (از session، روی afterDiscount)
+      let insuranceAmount = 0;
+      if (sess.insuranceType === "percent" && sess.insuranceValue) {
+        insuranceAmount = Math.round((afterDiscount * sess.insuranceValue) / 100);
+      } else if (sess.insuranceType === "amount" && sess.insuranceValue) {
+        insuranceAmount = sess.insuranceValue;
+      }
+      const patientAmount = Math.max(0, afterDiscount - insuranceAmount);
+
+      // ⭐ لیست درمان‌ها
       const sessionTreatments: SessionTreatment[] = records.map((r) => {
         const rec = r as TreatmentRecord;
-        const fin = calculateFinancials({
-          price: rec.price || 0,
-          discountType: rec.discountType,
-          discountValue: rec.discountValue,
-          insuranceType: rec.insuranceType,
-          insuranceValue: rec.insuranceValue,
-        });
-
-        totalPrice += fin.price;
-        totalDiscount += fin.discountAmount;
-        totalInsurance += fin.insuranceAmount;
-        totalPatient += fin.patientAmount;
-        totalAfterDiscount += fin.afterDiscount;
-
         return {
           record: r,
           label:
@@ -147,7 +156,7 @@ const allSessions = computed<SessionView[]>(() => {
           assistantName: rec.assistantId
             ? getStaffById(rec.assistantId)?.name ?? "—"
             : "—",
-          financials: fin,
+          price: rec.price || 0,
         };
       });
 
@@ -156,7 +165,7 @@ const allSessions = computed<SessionView[]>(() => {
       const total = records.length;
       const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
-      // ⭐ اطلاعات طرح (اگر دارد)
+      // ⭐ اطلاعات طرح
       const plan = sess.planId ? getPlanById(sess.planId) : undefined;
       const planTotalSessions = sess.planId
         ? getSessionCountForPlan(sess.planId)
@@ -171,7 +180,6 @@ const allSessions = computed<SessionView[]>(() => {
         status: sess.status,
         planId: sess.planId,
         planTitle: plan?.title,
-        // ⭐ شماره‌ی جلسه در طرح
         sessionNumberInPlan: sess.planId ? sess.sessionNumber : undefined,
         planTotalSessions,
         doctorId: sess.doctorId,
@@ -183,11 +191,18 @@ const allSessions = computed<SessionView[]>(() => {
           ? getStaffById(sess.assistantId)?.name ?? "—"
           : "—",
         records: sessionTreatments,
+        // ⭐ مالی
         totalPrice,
-        totalDiscount,
-        totalInsurance,
-        totalPatient,
-        totalAfterDiscount,
+        discountAmount,
+        afterDiscount,
+        insuranceAmount,
+        patientAmount,
+        discountType: sess.discountType,
+        discountValue: sess.discountValue,
+        discountReason: sess.discountReason,
+        insuranceType: sess.insuranceType,
+        insuranceValue: sess.insuranceValue,
+        insuranceName: sess.insuranceName,
         doneCount,
         plannedCount,
         progress,
@@ -272,23 +287,37 @@ function getStatusClass(status: string): string {
   return status;
 }
 
-// ⭐ عنوان نمایشی جلسه:
-//   - اگر جلسه عنوان سفارشی دارد → همان
-//   - اگر ندارد → «جلسه {شماره}»
 function getSessionDisplayTitle(sess: SessionView): string {
   return sess.sessionTitle?.trim() || `جلسه ${sess.sessionNumber}`;
 }
 
-// ⭐ برچسب طرح (با «جلسه X از Y»)
 function getPlanBadgeText(sess: SessionView): string {
   if (!sess.planTitle) return "";
-  if (
-    sess.sessionNumberInPlan != null &&
-    sess.planTotalSessions != null
-  ) {
+  if (sess.sessionNumberInPlan != null && sess.planTotalSessions != null) {
     return `${sess.planTitle} (جلسه ${sess.sessionNumberInPlan} از ${sess.planTotalSessions})`;
   }
   return sess.planTitle;
+}
+
+// ⭐ متن تخفیف برای نمایش
+function getDiscountLabel(sess: SessionView): string {
+  if (!sess.discountType || !sess.discountValue) return "";
+  const val =
+    sess.discountType === "percent"
+      ? `${sess.discountValue}٪`
+      : formatPrice(sess.discountValue);
+  const reason = sess.discountReason ? ` — ${sess.discountReason}` : "";
+  return `${val}${reason}`;
+}
+
+function getInsuranceLabel(sess: SessionView): string {
+  if (!sess.insuranceType || sess.insuranceType === "none" || !sess.insuranceValue) return "";
+  const name = sess.insuranceName ? `${sess.insuranceName}: ` : "";
+  const val =
+    sess.insuranceType === "percent"
+      ? `${sess.insuranceValue}٪`
+      : formatPrice(sess.insuranceValue);
+  return `${name}${val}`;
 }
 
 function openEditSession(sess: SessionView) {
@@ -324,6 +353,9 @@ function printSession(sess: SessionView) {
         .meta div { padding: 6px; background: #f5f5f5; border-radius: 4px; }
         .plan-box { padding: 8px 10px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: 12px; margin-bottom: 10px; }
         .plan-box.no-plan { background: #f3f4f6; border-color: #e5e7eb; color: #6b7280; }
+        .financial-box { padding: 10px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 12px; margin-bottom: 12px; }
+        .financial-box .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .financial-box .row.bold { font-weight: bold; border-top: 1px solid #16a34a; padding-top: 6px; margin-top: 6px; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
         th { background: #2563eb; color: #fff; }
@@ -360,9 +392,6 @@ function printSession(sess: SessionView) {
             <th>درمان</th>
             <th>وضعیت</th>
             <th>قیمت</th>
-            <th>تخفیف</th>
-            <th>بیمه</th>
-            <th>سهم بیمار</th>
           </tr>
         </thead>
         <tbody>
@@ -373,18 +402,7 @@ function printSession(sess: SessionView) {
               <td>#${r.record.toothNo}</td>
               <td>${r.label}</td>
               <td>${r.record.status === "done" ? "انجام‌شده" : "طرح"}</td>
-              <td>${formatPrice(r.financials.price)}</td>
-              <td>${
-                r.financials.discountAmount > 0
-                  ? "- " + formatPrice(r.financials.discountAmount)
-                  : "—"
-              }</td>
-              <td>${
-                r.financials.insuranceAmount > 0
-                  ? formatPrice(r.financials.insuranceAmount)
-                  : "—"
-              }</td>
-              <td>${formatPrice(r.financials.patientAmount)}</td>
+              <td>${formatPrice(r.price)}</td>
             </tr>
           `,
             )
@@ -394,20 +412,20 @@ function printSession(sess: SessionView) {
           : `<div style="padding:12px;text-align:center;color:#999;font-size:12px;">هنوز درمانی ثبت نشده</div>`
       }
 
-      <div class="total">
-        <div class="total-row"><span>جمع کل:</span><span>${formatPrice(sess.totalPrice)}</span></div>
+      <div class="financial-box">
+        <div class="row"><span>جمع درمان‌ها:</span><span>${formatPrice(sess.totalPrice)}</span></div>
         ${
-          sess.totalDiscount > 0
-            ? `<div class="total-row"><span>تخفیف:</span><span>- ${formatPrice(sess.totalDiscount)}</span></div>`
+          sess.discountAmount > 0
+            ? `<div class="row"><span>تخفیف کل جلسه (${getDiscountLabel(sess)}):</span><span>- ${formatPrice(sess.discountAmount)}</span></div>`
             : ""
         }
-        <div class="total-row"><span>بعد از تخفیف:</span><span>${formatPrice(sess.totalAfterDiscount)}</span></div>
+        <div class="row"><span>بعد از تخفیف:</span><span>${formatPrice(sess.afterDiscount)}</span></div>
         ${
-          sess.totalInsurance > 0
-            ? `<div class="total-row"><span>سهم بیمه:</span><span>${formatPrice(sess.totalInsurance)}</span></div>`
+          sess.insuranceAmount > 0
+            ? `<div class="row"><span>سهم بیمه (${getInsuranceLabel(sess)}):</span><span>${formatPrice(sess.insuranceAmount)}</span></div>`
             : ""
         }
-        <div class="total-row bold"><span>سهم بیمار:</span><span>${formatPrice(sess.totalPatient)}</span></div>
+        <div class="row bold"><span>سهم بیمار:</span><span>${formatPrice(sess.patientAmount)}</span></div>
       </div>
 
       <div class="footer">
@@ -498,10 +516,7 @@ function printSession(sess: SessionView) {
         ]"
       >
         <!-- Session Header -->
-        <div
-          class="session-header"
-          @click="toggleExpand(sess.sessionId)"
-        >
+        <div class="session-header" @click="toggleExpand(sess.sessionId)">
           <div class="session-date-icon">
             <span class="icon">
               {{
@@ -522,8 +537,6 @@ function printSession(sess: SessionView) {
               <span v-if="sess.sessionTime" class="time-badge">
                 🕐 {{ sess.sessionTime }}
               </span>
-
-              <!-- ⭐ برچسب طرح -->
               <span
                 v-if="sess.planTitle"
                 class="plan-badge"
@@ -531,18 +544,13 @@ function printSession(sess: SessionView) {
               >
                 📋 {{ getPlanBadgeText(sess) }}
               </span>
-              <span v-else class="plan-badge no-plan">
-                📋 بدون طرح
-              </span>
-
+              <span v-else class="plan-badge no-plan"> 📋 بدون طرح </span>
               <span :class="['status-badge-mini', sess.status]">
                 {{ getStatusLabel(sess.status) }}
               </span>
             </div>
             <div class="session-meta">
-              <span class="meta-item">
-                🛠 {{ sess.records.length }} مورد
-              </span>
+              <span class="meta-item"> 🛠 {{ sess.records.length }} مورد </span>
               <span v-if="sess.doctorName !== '—'" class="meta-item">
                 👨‍⚕️ {{ sess.doctorName }}
               </span>
@@ -552,7 +560,7 @@ function printSession(sess: SessionView) {
             </div>
           </div>
           <div class="session-total">
-            {{ formatPrice(sess.totalPatient) }}
+            {{ formatPrice(sess.patientAmount) }}
           </div>
           <span class="expand-icon">
             {{ expandedSessionKey === sess.sessionId ? "▲" : "▼" }}
@@ -566,9 +574,7 @@ function printSession(sess: SessionView) {
         >
           <!-- Progress -->
           <div class="progress-section">
-            <div class="progress-label">
-              پیشرفت جلسه: {{ sess.progress }}%
-            </div>
+            <div class="progress-label">پیشرفت جلسه: {{ sess.progress }}%</div>
             <div class="progress-bar">
               <div
                 class="progress-fill"
@@ -576,8 +582,8 @@ function printSession(sess: SessionView) {
               ></div>
             </div>
             <div class="progress-hint">
-              ✅ {{ sess.doneCount }} انجام‌شده • ⏳
-              {{ sess.plannedCount }} در انتظار
+              ✅ {{ sess.doneCount }} انجام‌شده • ⏳ {{ sess.plannedCount }} در
+              انتظار
             </div>
           </div>
 
@@ -591,9 +597,6 @@ function printSession(sess: SessionView) {
                 <th>دستیار</th>
                 <th>وضعیت</th>
                 <th>قیمت</th>
-                <th>تخفیف</th>
-                <th>بیمه</th>
-                <th>سهم بیمار</th>
                 <th></th>
               </tr>
             </thead>
@@ -608,36 +611,11 @@ function printSession(sess: SessionView) {
                 <td>{{ item.doctorName }}</td>
                 <td>{{ item.assistantName }}</td>
                 <td>
-                  <span
-                    :class="['status-pill', item.record.status]"
-                  >
-                    {{
-                      item.record.status === "done"
-                        ? "✅ انجام"
-                        : "⏳ طرح"
-                    }}
+                  <span :class="['status-pill', item.record.status]">
+                    {{ item.record.status === "done" ? "✅ انجام" : "⏳ طرح" }}
                   </span>
                 </td>
-                <td class="price-cell">
-                  {{ formatPrice(item.financials.price) }}
-                </td>
-                <td class="discount-cell">
-                  {{
-                    item.financials.discountAmount > 0
-                      ? "- " + formatPrice(item.financials.discountAmount)
-                      : "—"
-                  }}
-                </td>
-                <td class="insurance-cell">
-                  {{
-                    item.financials.insuranceAmount > 0
-                      ? formatPrice(item.financials.insuranceAmount)
-                      : "—"
-                  }}
-                </td>
-                <td class="patient-cell">
-                  {{ formatPrice(item.financials.patientAmount) }}
-                </td>
+                <td class="price-cell">{{ formatPrice(item.price) }}</td>
                 <td class="actions-cell">
                   <button
                     class="btn-icon-sm"
@@ -654,33 +632,27 @@ function printSession(sess: SessionView) {
             هنوز درمانی به این جلسه اضافه نشده
           </div>
 
-          <!-- Financial Summary -->
+          <!-- ⭐ Financial Summary (محاسبه از session) -->
           <div class="financial-summary">
             <div class="summary-row">
-              <span>جمع کل:</span>
+              <span>جمع درمان‌ها:</span>
               <span>{{ formatPrice(sess.totalPrice) }}</span>
             </div>
-            <div
-              v-if="sess.totalDiscount > 0"
-              class="summary-row discount"
-            >
-              <span>تخفیف:</span>
-              <span>- {{ formatPrice(sess.totalDiscount) }}</span>
+            <div v-if="sess.discountAmount > 0" class="summary-row discount">
+              <span>تخفیف کل جلسه ({{ getDiscountLabel(sess) }}):</span>
+              <span>- {{ formatPrice(sess.discountAmount) }}</span>
             </div>
             <div class="summary-row after-discount">
               <span>بعد از تخفیف:</span>
-              <span>{{ formatPrice(sess.totalAfterDiscount) }}</span>
+              <span>{{ formatPrice(sess.afterDiscount) }}</span>
             </div>
-            <div
-              v-if="sess.totalInsurance > 0"
-              class="summary-row insurance"
-            >
-              <span>سهم بیمه:</span>
-              <span>{{ formatPrice(sess.totalInsurance) }}</span>
+            <div v-if="sess.insuranceAmount > 0" class="summary-row insurance">
+              <span>سهم بیمه ({{ getInsuranceLabel(sess) }}):</span>
+              <span>{{ formatPrice(sess.insuranceAmount) }}</span>
             </div>
             <div class="summary-row patient total">
               <span>سهم بیمار:</span>
-              <span>{{ formatPrice(sess.totalPatient) }}</span>
+              <span>{{ formatPrice(sess.patientAmount) }}</span>
             </div>
           </div>
 
@@ -689,10 +661,7 @@ function printSession(sess: SessionView) {
             <button class="btn-print" @click="printSession(sess)">
               🖨 چاپ جلسه
             </button>
-            <button
-              class="btn-edit"
-              @click="openEditSession(sess)"
-            >
+            <button class="btn-edit" @click="openEditSession(sess)">
               ✏️ ویرایش جلسه
             </button>
           </div>
@@ -1060,22 +1029,7 @@ function printSession(sess: SessionView) {
 
 .price-cell {
   white-space: nowrap;
-}
-
-.discount-cell {
-  color: #dc2626;
-  white-space: nowrap;
-}
-
-.insurance-cell {
-  color: #2563eb;
-  white-space: nowrap;
-}
-
-.patient-cell {
-  color: #059669;
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .actions-cell {

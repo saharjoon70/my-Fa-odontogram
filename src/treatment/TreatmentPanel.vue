@@ -8,9 +8,9 @@ import {
 import { submitTreatment } from "./applyTreatment";
 import {
   addSession,
+  updateSession,
   getNextSessionNumber,
   getNextSessionNumberForPatient,
-    saveLastSelection,   // ⭐ جدید
 } from "./treatmentPlanStore";
 import TreatmentForm from "./TreatmentForm.vue";
 
@@ -57,22 +57,16 @@ function onSubmit(payload: {
   assistantId?: string;
   date: string;
   time: string;
+  // ⭐ مالی جلسه
   discountType?: "percent" | "amount";
   discountValue?: number;
   discountReason?: string;
-  discountAmount?: number;
   insuranceType?: "percent" | "amount" | "none";
   insuranceValue?: number;
   insuranceName?: string;
-  insuranceAmount?: number;
-  patientAmount?: number;
 }) {
   // ═══════════════════════════════════════════════════════════════
-  // ⭐ mode = planned (طرح درمان)
-  //    - فقط طرح در تب «طرح درمان» ثبت می‌شود
-  //    - جلسه‌ای ساخته نمی‌شود
-  //    - sessionId به TreatmentRecord داده نمی‌شود
-  //    - جلسه در ابتدا ۰ است (منشی بعداً می‌تواند از تب طرح بسازد)
+  // mode = planned → فقط طرح (بدون جلسه، بدون درمان)
   // ═══════════════════════════════════════════════════════════════
   if (payload.status === "planned") {
     for (const toothNo of selectedTeeth.value) {
@@ -87,11 +81,7 @@ function onSubmit(payload: {
         note: payload.note,
         planId: payload.planId,
         planTitle: payload.planTitle,
-        // ❌ بدون sessionId / sessionNumber / sessionTitle
-        // ❌ بدون sessionDate / sessionTime / time
         doctorId: payload.doctorId,
-        // ❌ بدون assistantId
-        // ❌ بدون تخفیف / بیمه
       });
     }
     refresh();
@@ -99,35 +89,40 @@ function onSubmit(payload: {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // ⭐ mode = done (ثبت درمان)
-  //    - جلسه ساخته/انتخاب می‌شود
-  //    - درمان به آن جلسه متصل می‌شود
+  // mode = done → جلسه + درمان
   // ═══════════════════════════════════════════════════════════════
+
+  // ─── مالی جلسه (فقط این بخش روی session ذخیره می‌شود) ───
+  const sessionFinancial = {
+    discountType: payload.discountType,
+    discountValue: payload.discountValue,
+    discountReason: payload.discountReason,
+    insuranceType: payload.insuranceType ?? "none",
+    insuranceValue: payload.insuranceValue,
+    insuranceName: payload.insuranceName,
+  };
 
   // ─── مرحله ۱: تعیین جلسه ───
   let finalSessionId = payload.sessionId;
   let finalSessionNumber: number | undefined;
   let finalSessionTitle = payload.sessionTitle;
 
-  const needsNewSession =
-    payload.sessionMode !== "existing" || !finalSessionId;
+  const isExistingSession =
+    payload.sessionMode === "existing" && !!finalSessionId;
 
-  if (needsNewSession) {
-    // شماره‌ی جلسه:
-    //   - اگر طرح انتخاب شده → شماره‌ی بعدی در آن طرح
-    //   - اگر طرح نیست → شماره‌ی بعدی کلی بیمار
+  if (isExistingSession && finalSessionId) {
+    // ⭐ جلسه‌ی موجود → فقط تخفیف/بیمه را روی آن آپدیت کن
+    updateSession(finalSessionId, sessionFinancial);
+  } else {
+    // ⭐ جلسه‌ی جدید بساز
     const nextNum = payload.planId
       ? getNextSessionNumber(payload.planId)
       : getNextSessionNumberForPatient(props.patientId);
 
-    // عنوان جلسه:
-    //   - اگر کاربر داده → همان
-    //   - وگرنه → «جلسه {شماره}» (خودکار)
     const sessionTitle = payload.sessionTitle?.trim() || `جلسه ${nextNum}`;
 
     const newSess = addSession({
       patientId: props.patientId,
-      // planId اختیاری است — اگر undefined باشد، جلسه بدون طرح ساخته می‌شود
       planId: payload.planId,
       sessionNumber: nextNum,
       title: sessionTitle,
@@ -136,23 +131,16 @@ function onSubmit(payload: {
       status: "done",
       doctorId: payload.doctorId,
       assistantId: payload.assistantId,
+      // ⭐ مالی جلسه
+      ...sessionFinancial,
     });
 
     finalSessionId = newSess.id;
     finalSessionNumber = newSess.sessionNumber;
     finalSessionTitle = newSess.title;
-
-    // ⭐ بعد از ساخت session، حافظه را با sessionId جلسه‌ی جدید آپدیت کن
-saveLastSelection(props.patientId, {
-  sessionMode: "existing",
-  selectedSessionId: newSess.id,
-  selectedPlanId: payload.planId ?? "",
-});
   }
-  // ⭐ حالت existing: sessionId از payload می‌آید،
-  //    sessionNumber/sessionTitle در SessionsPanel از planStore خوانده می‌شوند.
 
-  // ─── مرحله ۲: ثبت درمان برای هر دندان ───
+  // ─── مرحله ۲: ثبت درمان برای هر دندان (بدون تخفیف/بیمه) ───
   for (const toothNo of selectedTeeth.value) {
     submitTreatment(props.patientId, toothNo, {
       treatmentId: payload.treatmentId,
@@ -161,7 +149,7 @@ saveLastSelection(props.patientId, {
       surface: payload.surfaces?.[0],
       material: payload.material,
       price: payload.price,
-      status: payload.status,
+      status: "done",
       note: payload.note,
       planId: payload.planId,
       planTitle: payload.planTitle,
@@ -173,15 +161,7 @@ saveLastSelection(props.patientId, {
       sessionDate: payload.date,
       sessionTime: payload.time,
       time: payload.time,
-      discountType: payload.discountType,
-      discountValue: payload.discountValue,
-      discountReason: payload.discountReason,
-      discountAmount: payload.discountAmount,
-      insuranceType: payload.insuranceType,
-      insuranceValue: payload.insuranceValue,
-      insuranceName: payload.insuranceName,
-      insuranceAmount: payload.insuranceAmount,
-      patientAmount: payload.patientAmount,
+      // ❌ تخفیف/بیمه اینجا نمی‌رود (روی session است)
     });
   }
 
@@ -191,14 +171,12 @@ saveLastSelection(props.patientId, {
 
 <template>
   <div class="treatment-panel" dir="rtl">
-    <!-- ═══ Form ═══ -->
     <TreatmentForm
       :patient-id="patientId"
       :tooth-nos="selectedTeeth"
       @submit="onSubmit"
     />
 
-    <!-- ⭐ اگه دندونی انتخاب نشده -->
     <div v-if="selectedTeeth.length === 0" class="empty-hint">
       👆 یک یا چند دندان از چارت انتخاب کنید
     </div>

@@ -13,14 +13,19 @@ import {
 } from "./treatmentPlanStore";
 import { getRecordsForPatient } from "./treatmentStore";
 import type { TreatmentRecord } from "./treatmentStore";
+import {
+  DISCOUNT_PRESETS,
+  getInsuranceProviders,
+  type DiscountPreset,
+  type InsuranceProvider,
+} from "./insuranceStore";
 
-// ═══ Props & Emits ═══
 const props = defineProps<{
   open: boolean;
   patientId: string;
   planId: string;
   planTitle?: string;
-  sessionId?: string; // ⭐ اگه داشته باشه → حالت ویرایش
+  sessionId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -48,6 +53,18 @@ const doctorId = ref("");
 const assistantId = ref("");
 const note = ref("");
 
+// ⭐ مالی
+const hasDiscount = ref(false);
+const discountType = ref<"percent" | "amount">("percent");
+const discountValue = ref(0);
+const discountReason = ref("");
+const selectedDiscountPreset = ref<string>("none");
+
+const hasInsurance = ref(false);
+const insuranceType = ref<"percent" | "amount">("percent");
+const insuranceValue = ref(0);
+const insuranceName = ref("");
+
 // ═══ Preview تعداد درمان ═══
 const existingTreatments = computed(() => {
   if (!props.sessionId) return 0;
@@ -56,6 +73,44 @@ const existingTreatments = computed(() => {
       r.kind === "treatment" && r.sessionId === props.sessionId,
   ).length;
 });
+
+// ⭐ جمع قیمت درمان‌ها (برای پیش‌نمایش محاسبات)
+const sessionTotalPrice = computed(() => {
+  if (!props.sessionId) return 0;
+  return getRecordsForPatient(props.patientId)
+    .filter(
+      (r): r is TreatmentRecord =>
+        r.kind === "treatment" && r.sessionId === props.sessionId,
+    )
+    .reduce((sum, r) => sum + (r.price || 0), 0);
+});
+
+// ⭐ محاسبات داینامیک
+const discountAmount = computed(() => {
+  if (!hasDiscount.value || !discountValue.value) return 0;
+  if (discountType.value === "percent") {
+    return Math.round((sessionTotalPrice.value * discountValue.value) / 100);
+  }
+  return Math.min(discountValue.value, sessionTotalPrice.value);
+});
+
+const afterDiscount = computed(() =>
+  Math.max(0, sessionTotalPrice.value - discountAmount.value),
+);
+
+const insuranceAmount = computed(() => {
+  if (!hasInsurance.value || !insuranceValue.value) return 0;
+  if (insuranceType.value === "percent") {
+    return Math.round((afterDiscount.value * insuranceValue.value) / 100);
+  }
+  return Math.min(insuranceValue.value, afterDiscount.value);
+});
+
+const patientAmount = computed(() =>
+  Math.max(0, afterDiscount.value - insuranceAmount.value),
+);
+
+const insuranceProviders = computed(() => getInsuranceProviders());
 
 // ═══ Watch: open → load form ═══
 watch(
@@ -79,6 +134,42 @@ function loadForm() {
       doctorId.value = sess.doctorId ?? "";
       assistantId.value = sess.assistantId ?? "";
       note.value = sess.note ?? "";
+
+      // ⭐ تخفیف
+      if (sess.discountType && sess.discountValue) {
+        hasDiscount.value = true;
+        discountType.value = sess.discountType;
+        discountValue.value = sess.discountValue;
+        discountReason.value = sess.discountReason ?? "";
+        const matchPreset = DISCOUNT_PRESETS.find(
+          (p) => p.type === sess.discountType && p.value === sess.discountValue,
+        );
+        selectedDiscountPreset.value = matchPreset?.id ?? "custom";
+      } else {
+        hasDiscount.value = false;
+        discountType.value = "percent";
+        discountValue.value = 0;
+        discountReason.value = "";
+        selectedDiscountPreset.value = "none";
+      }
+
+      // ⭐ بیمه
+      if (
+        sess.insuranceType &&
+        sess.insuranceType !== "none" &&
+        sess.insuranceValue
+      ) {
+        hasInsurance.value = true;
+        insuranceType.value =
+          sess.insuranceType === "amount" ? "amount" : "percent";
+        insuranceValue.value = sess.insuranceValue;
+        insuranceName.value = sess.insuranceName ?? "";
+      } else {
+        hasInsurance.value = false;
+        insuranceType.value = "percent";
+        insuranceValue.value = 0;
+        insuranceName.value = "";
+      }
     }
   } else {
     // ⭐ جدید
@@ -90,6 +181,15 @@ function loadForm() {
     doctorId.value = doctors.value[0]?.id ?? "";
     assistantId.value = "";
     note.value = "";
+    hasDiscount.value = false;
+    discountType.value = "percent";
+    discountValue.value = 0;
+    discountReason.value = "";
+    selectedDiscountPreset.value = "none";
+    hasInsurance.value = false;
+    insuranceType.value = "percent";
+    insuranceValue.value = 0;
+    insuranceName.value = "";
   }
 }
 
@@ -98,6 +198,32 @@ function suggestTitle() {
   if (!title.value || title.value.startsWith("جلسه ")) {
     title.value = `جلسه ${sessionNumber.value}`;
   }
+}
+
+// ═══ Discount presets ═══
+function applyDiscountPreset(preset: DiscountPreset) {
+  selectedDiscountPreset.value = preset.id;
+  if (preset.id === "none") {
+    hasDiscount.value = false;
+    discountValue.value = 0;
+    discountReason.value = "";
+  } else if (preset.id === "custom") {
+    hasDiscount.value = true;
+    discountType.value = "amount";
+    discountValue.value = 0;
+  } else {
+    hasDiscount.value = true;
+    discountType.value = preset.type;
+    discountValue.value = preset.value;
+    discountReason.value = preset.label;
+  }
+}
+
+function applyInsurance(ins: InsuranceProvider) {
+  hasInsurance.value = true;
+  insuranceType.value = "percent";
+  insuranceValue.value = ins.defaultPercent;
+  insuranceName.value = ins.name;
 }
 
 // ═══ Save ═══
@@ -111,6 +237,23 @@ function save() {
     return;
   }
 
+  // ⭐ type صریح برای رفع خطای TypeScript
+  const financial: {
+    discountType?: "percent" | "amount";
+    discountValue?: number;
+    discountReason?: string;
+    insuranceType?: "percent" | "amount" | "none";
+    insuranceValue?: number;
+    insuranceName?: string;
+  } = {
+    discountType: hasDiscount.value ? discountType.value : undefined,
+    discountValue: hasDiscount.value ? discountValue.value : undefined,
+    discountReason: hasDiscount.value ? discountReason.value : undefined,
+    insuranceType: hasInsurance.value ? insuranceType.value : "none",
+    insuranceValue: hasInsurance.value ? insuranceValue.value : undefined,
+    insuranceName: hasInsurance.value ? insuranceName.value : undefined,
+  };
+
   if (isEditMode.value && props.sessionId) {
     // ⭐ ویرایش
     updateSession(props.sessionId, {
@@ -122,6 +265,7 @@ function save() {
       doctorId: doctorId.value || undefined,
       assistantId: assistantId.value || undefined,
       note: note.value.trim() || undefined,
+      ...financial,
     });
     emit("saved", props.sessionId);
   } else {
@@ -137,6 +281,7 @@ function save() {
       doctorId: doctorId.value || undefined,
       assistantId: assistantId.value || undefined,
       note: note.value.trim() || undefined,
+      ...financial,
     });
     emit("saved", newSess.id);
   }
@@ -180,6 +325,10 @@ function formatDate(iso: string): string {
     return iso;
   }
 }
+
+function formatPrice(n: number): string {
+  return n.toLocaleString("fa-IR") + " ت";
+}
 </script>
 
 <template>
@@ -189,26 +338,14 @@ function formatDate(iso: string): string {
       class="session-modal-backdrop"
       @mousedown.self="emit('close')"
     >
-      <div
-        class="session-modal"
-        dir="rtl"
-      >
+      <div class="session-modal" dir="rtl">
         <!-- Header -->
         <div class="modal-header">
           <div>
             <h2>{{ isEditMode ? "✏️ ویرایش جلسه" : "📁 جلسه جدید" }}</h2>
-            <div
-              v-if="planTitle"
-              class="subtitle"
-            >
-              📋 {{ planTitle }}
-            </div>
+            <div v-if="planTitle" class="subtitle">📋 {{ planTitle }}</div>
           </div>
-          <button
-            class="close-btn"
-            @click="emit('close')"
-            title="بستن"
-          >
+          <button class="close-btn" @click="emit('close')" title="بستن">
             ✕
           </button>
         </div>
@@ -227,7 +364,7 @@ function formatDate(iso: string): string {
                 min="1"
                 class="form-input"
                 @change="suggestTitle"
-              >
+              />
             </div>
             <div class="form-group">
               <label class="form-label">
@@ -238,7 +375,7 @@ function formatDate(iso: string): string {
                 type="text"
                 placeholder="مثلاً: تکمیل روکش‌ها"
                 class="form-input"
-              >
+              />
             </div>
           </div>
 
@@ -248,19 +385,11 @@ function formatDate(iso: string): string {
               <label class="form-label">
                 تاریخ <span class="required">*</span>
               </label>
-              <input
-                v-model="sessionDate"
-                type="date"
-                class="form-input"
-              >
+              <input v-model="sessionDate" type="date" class="form-input" />
             </div>
             <div class="form-group">
               <label class="form-label">ساعت</label>
-              <input
-                v-model="sessionTime"
-                type="time"
-                class="form-input"
-              >
+              <input v-model="sessionTime" type="time" class="form-input" />
             </div>
           </div>
 
@@ -273,11 +402,7 @@ function formatDate(iso: string): string {
                 :key="opt.value"
                 :class="['status-option', { active: status === opt.value }]"
               >
-                <input
-                  v-model="status"
-                  type="radio"
-                  :value="opt.value"
-                >
+                <input v-model="status" type="radio" :value="opt.value" />
                 <span class="status-icon">{{ opt.icon }}</span>
                 <span>{{ opt.label }}</span>
               </label>
@@ -288,35 +413,169 @@ function formatDate(iso: string): string {
           <div class="form-row-2">
             <div class="form-group">
               <label class="form-label">👨‍⚕️ دکتر</label>
-              <select
-                v-model="doctorId"
-                class="form-select"
-              >
+              <select v-model="doctorId" class="form-select">
                 <option value="">— انتخاب کنید —</option>
-                <option
-                  v-for="d in doctors"
-                  :key="d.id"
-                  :value="d.id"
-                >
+                <option v-for="d in doctors" :key="d.id" :value="d.id">
                   {{ d.name }}
                 </option>
               </select>
             </div>
             <div class="form-group">
               <label class="form-label">👤 دستیار</label>
-              <select
-                v-model="assistantId"
-                class="form-select"
-              >
+              <select v-model="assistantId" class="form-select">
                 <option value="">— بدون دستیار —</option>
-                <option
-                  v-for="a in assistants"
-                  :key="a.id"
-                  :value="a.id"
-                >
+                <option v-for="a in assistants" :key="a.id" :value="a.id">
                   {{ a.name }}
                 </option>
               </select>
+            </div>
+          </div>
+
+          <!-- ⭐ مالی جلسه -->
+          <div class="financial-section">
+            <div class="financial-header">
+              💰 مالی — برای کل جلسه
+            </div>
+
+            <!-- جمع درمان‌ها -->
+            <div v-if="isEditMode && sessionTotalPrice > 0" class="preview-row">
+              <span>جمع درمان‌های این جلسه:</span>
+              <span>{{ formatPrice(sessionTotalPrice) }}</span>
+            </div>
+
+            <!-- تخفیف -->
+            <div class="subsection-label">🏷️ تخفیف کل جلسه</div>
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input v-model="hasDiscount" type="checkbox" />
+                <span>این جلسه تخفیف دارد</span>
+              </label>
+            </div>
+            <div v-if="hasDiscount" class="sub-panel">
+              <div class="preset-chips">
+                <button
+                  v-for="preset in DISCOUNT_PRESETS"
+                  :key="preset.id"
+                  :class="[
+                    'preset-chip',
+                    { active: selectedDiscountPreset === preset.id },
+                  ]"
+                  :style="
+                    selectedDiscountPreset === preset.id
+                      ? {
+                          background: preset.color,
+                          color: '#fff',
+                          borderColor: preset.color,
+                        }
+                      : {}
+                  "
+                  @click="applyDiscountPreset(preset)"
+                >
+                  {{ preset.label }}
+                </button>
+              </div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label class="form-label">نوع</label>
+                  <select v-model="discountType" class="form-select">
+                    <option value="percent">درصدی</option>
+                    <option value="amount">مبلغی</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">مقدار</label>
+                  <input
+                    v-model.number="discountValue"
+                    type="number"
+                    min="0"
+                    class="form-input"
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">دلیل</label>
+                <input
+                  v-model="discountReason"
+                  type="text"
+                  class="form-input"
+                  placeholder="اختیاری"
+                />
+              </div>
+            </div>
+
+            <!-- بیمه -->
+            <div class="subsection-label">🏥 بیمه کل جلسه</div>
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input v-model="hasInsurance" type="checkbox" />
+                <span>این جلسه بیمه دارد</span>
+              </label>
+            </div>
+            <div v-if="hasInsurance" class="sub-panel">
+              <div class="preset-chips">
+                <button
+                  v-for="ins in insuranceProviders"
+                  :key="ins.id"
+                  :class="[
+                    'preset-chip',
+                    { active: insuranceName === ins.name },
+                  ]"
+                  :style="
+                    insuranceName === ins.name
+                      ? {
+                          background: ins.color,
+                          color: '#fff',
+                          borderColor: ins.color,
+                        }
+                      : {}
+                  "
+                  @click="applyInsurance(ins)"
+                >
+                  {{ ins.name }} ({{ ins.defaultPercent }}٪)
+                </button>
+              </div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label class="form-label">نوع</label>
+                  <select v-model="insuranceType" class="form-select">
+                    <option value="percent">درصدی</option>
+                    <option value="amount">مبلغی</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">مقدار</label>
+                  <input
+                    v-model.number="insuranceValue"
+                    type="number"
+                    min="0"
+                    class="form-input"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- پیش‌نمایش محاسبات (فقط در ویرایش) -->
+            <div v-if="isEditMode && sessionTotalPrice > 0" class="preview-summary">
+              <div class="preview-row">
+                <span>جمع درمان‌ها:</span>
+                <span>{{ formatPrice(sessionTotalPrice) }}</span>
+              </div>
+              <div v-if="discountAmount > 0" class="preview-row discount">
+                <span>تخفیف:</span>
+                <span>- {{ formatPrice(discountAmount) }}</span>
+              </div>
+              <div class="preview-row after-discount">
+                <span>بعد از تخفیف:</span>
+                <span>{{ formatPrice(afterDiscount) }}</span>
+              </div>
+              <div v-if="insuranceAmount > 0" class="preview-row insurance">
+                <span>سهم بیمه:</span>
+                <span>{{ formatPrice(insuranceAmount) }}</span>
+              </div>
+              <div class="preview-row bold">
+                <span>سهم بیمار:</span>
+                <span>{{ formatPrice(patientAmount) }}</span>
+              </div>
             </div>
           </div>
 
@@ -331,34 +590,24 @@ function formatDate(iso: string): string {
             ></textarea>
           </div>
 
-          <!-- ⭐ در حالت ویرایش: آمار -->
-          <div
-            v-if="isEditMode && existingTreatments > 0"
-            class="stats-info"
-          >
+          <!-- آمار -->
+          <div v-if="isEditMode && existingTreatments > 0" class="stats-info">
             <div class="stat-info-item">
               <span class="stat-info-label">🛠 درمان‌های این جلسه:</span>
               <span class="stat-info-value">{{ existingTreatments }}</span>
             </div>
           </div>
 
-          <!-- ⭐ لیست جلسات دیگه‌ی این طرح -->
-          <div
-            v-if="planSessions.length > 0"
-            class="other-sessions"
-          >
-            <div class="other-sessions-title">
-              📁 جلسات دیگر این طرح:
-            </div>
+          <!-- جلسات دیگر -->
+          <div v-if="planSessions.length > 0" class="other-sessions">
+            <div class="other-sessions-title">📁 جلسات دیگر این طرح:</div>
             <div class="other-sessions-list">
               <span
                 v-for="s in planSessions.filter((x) => x.id !== sessionId)"
                 :key="s.id"
                 :class="['other-session-chip', s.status]"
               >
-                {{ s.sessionNumber }}. {{ s.title }} ({{
-                  formatDate(s.sessionDate)
-                }})
+                {{ s.sessionNumber }}. {{ s.title }} ({{ formatDate(s.sessionDate) }})
               </span>
             </div>
           </div>
@@ -366,24 +615,12 @@ function formatDate(iso: string): string {
 
         <!-- Footer -->
         <div class="modal-footer">
-          <button
-            v-if="isEditMode"
-            class="btn-danger"
-            @click="del"
-          >
+          <button v-if="isEditMode" class="btn-danger" @click="del">
             🗑 حذف
           </button>
           <div class="spacer"></div>
-          <button
-            class="btn-secondary"
-            @click="emit('close')"
-          >
-            انصراف
-          </button>
-          <button
-            class="btn-primary"
-            @click="save"
-          >
+          <button class="btn-secondary" @click="emit('close')">انصراف</button>
+          <button class="btn-primary" @click="save">
             {{ isEditMode ? "💾 ذخیره" : "✅ ایجاد جلسه" }}
           </button>
         </div>
@@ -393,7 +630,6 @@ function formatDate(iso: string): string {
 </template>
 
 <style scoped>
-/* ═══ Backdrop ═══ */
 .session-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -408,17 +644,12 @@ function formatDate(iso: string): string {
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* ═══ Modal ═══ */
 .session-modal {
-  width: min(580px, 96vw);
+  width: min(620px, 96vw);
   max-height: 90vh;
   background: #fff;
   border-radius: 16px;
@@ -428,7 +659,6 @@ function formatDate(iso: string): string {
   overflow: hidden;
 }
 
-/* ═══ Header ═══ */
 .modal-header {
   padding: 16px 20px;
   border-bottom: 1px solid #e5e7eb;
@@ -462,7 +692,6 @@ function formatDate(iso: string): string {
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  transition: all 0.15s;
 }
 
 .close-btn:hover {
@@ -471,7 +700,6 @@ function formatDate(iso: string): string {
   border-color: #fecaca;
 }
 
-/* ═══ Body ═══ */
 .modal-body {
   flex: 1;
   overflow-y: auto;
@@ -513,7 +741,6 @@ function formatDate(iso: string): string {
   font-size: 12px;
   background: #fff;
   width: 100%;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .form-input:focus,
@@ -529,7 +756,6 @@ function formatDate(iso: string): string {
   min-height: 60px;
 }
 
-/* ═══ Status Options ═══ */
 .status-options {
   display: flex;
   gap: 6px;
@@ -570,7 +796,136 @@ function formatDate(iso: string): string {
   font-size: 13px;
 }
 
-/* ═══ Stats Info ═══ */
+/* ⭐ مالی */
+.financial-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+}
+
+.financial-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #065f46;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #86efac;
+}
+
+.subsection-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.checkbox-row {
+  padding: 2px 0;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.sub-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.preset-chip {
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: #374151;
+  transition: all 0.15s;
+}
+
+.preset-chip:hover {
+  background: #f0f9ff;
+  border-color: #93c5fd;
+}
+
+.preset-chip.active {
+  font-weight: 600;
+  color: #fff;
+}
+
+.preview-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  margin-top: 6px;
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #374151;
+}
+
+.preview-row span:last-child {
+  font-weight: 600;
+}
+
+.preview-row.discount {
+  color: #dc2626;
+}
+
+.preview-row.insurance {
+  color: #2563eb;
+}
+
+.preview-row.after-discount {
+  border-top: 1px dashed #d1d5db;
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
+.preview-row.bold {
+  border-top: 2px solid #16a34a;
+  padding-top: 6px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #065f46;
+}
+
 .stats-info {
   padding: 10px 12px;
   background: #eff6ff;
@@ -596,7 +951,6 @@ function formatDate(iso: string): string {
   color: #1e40af;
 }
 
-/* ═══ Other Sessions ═══ */
 .other-sessions {
   padding: 10px 12px;
   background: #f9fafb;
@@ -644,7 +998,6 @@ function formatDate(iso: string): string {
   color: #991b1b;
 }
 
-/* ═══ Footer ═══ */
 .modal-footer {
   padding: 12px 20px;
   border-top: 1px solid #e5e7eb;
@@ -700,7 +1053,6 @@ function formatDate(iso: string): string {
   background: #fecaca;
 }
 
-/* ═══ Mobile ═══ */
 @media (max-width: 600px) {
   .form-row-2 {
     grid-template-columns: 1fr;
