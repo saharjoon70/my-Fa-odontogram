@@ -8,7 +8,12 @@ import {
   type StatusSelect,
 } from "./statusGroups";
 import { isItemChecked, getRadioValue } from "./statusToState";
-import { submitStatus, unsubmitStatus } from "./applyTreatment";
+import {
+  submitStatus,
+  unsubmitStatus,
+  applyStatusExtraPreset,
+} from "./applyTreatment";
+import { STATUS_EXTRAS } from "./status_extras";
 import FillingPanel from "./FillingPanel.vue";
 
 const props = defineProps<{
@@ -22,6 +27,19 @@ const emit = defineEmits<{
 }>();
 
 const activeGroup = ref<StatusGroup>("presence");
+const selectedExtraId = ref<string>("");
+
+// ⭐ اضافه کردن طرح درمان
+function applyExtra() {
+  if (!selectedExtraId.value) return;
+  const extra = STATUS_EXTRAS.options.find(
+    (o) => o.id === selectedExtraId.value,
+  );
+  if (!extra) return;
+  applyStatusExtraPreset(props.patientId, extra);
+  selectedExtraId.value = "";
+  emit("change");
+}
 
 // ⭐ گروه‌های مرتبط
 const applicableGroups = computed(() => {
@@ -38,7 +56,6 @@ const currentGroup = computed(() =>
   applicableGroups.value.find((g) => g.id === activeGroup.value),
 );
 
-// ⭐ آیتم‌های فیلترشده
 const applicableItems = computed(() => {
   const group = currentGroup.value;
   if (!group?.items) return [];
@@ -49,7 +66,6 @@ const applicableItems = computed(() => {
   });
 });
 
-// ⭐ رادیوهای فیلترشده
 const applicableRadios = computed(() => {
   const group = currentGroup.value;
   if (!group?.radios) return [];
@@ -60,7 +76,6 @@ const applicableRadios = computed(() => {
   });
 });
 
-// ⭐ SELECTهای فیلترشده
 const applicableSelects = computed(() => {
   const group = currentGroup.value;
   if (!group?.selects) return [];
@@ -100,11 +115,15 @@ watch(
   { deep: true },
 );
 
-watch(applicableGroups, (groups) => {
-  if (!groups.find((g) => g.id === activeGroup.value)) {
-    activeGroup.value = groups[0]?.id ?? "presence";
-  }
-}, { immediate: true });
+watch(
+  applicableGroups,
+  (groups) => {
+    if (!groups.find((g) => g.id === activeGroup.value)) {
+      activeGroup.value = groups[0]?.id ?? "presence";
+    }
+  },
+  { immediate: true },
+);
 
 function onToggleCheckbox(group: string, item: StatusItem, ev: Event) {
   const checked = (ev.target as HTMLInputElement).checked;
@@ -195,7 +214,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         </div>
       </div>
 
-      <!-- ⭐ اگر surfaceCross باشد، FillingPanel را نمایش بده -->
+      <!-- Surface Cross / FillingPanel -->
       <FillingPanel
         v-if="currentGroup.surfaceCross && props.toothState"
         :patient-id="patientId"
@@ -204,7 +223,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         @change="emit('change')"
       />
 
-      <!-- ⭐ Select ها (اگر surfaceCross نیست) -->
+      <!-- Select ها -->
       <div
         v-if="!currentGroup.surfaceCross && applicableSelects.length"
         class="select-section"
@@ -230,7 +249,7 @@ function isChecked(group: string, item: StatusItem): boolean {
         </label>
       </div>
 
-      <!-- ⭐ Checkbox ها (اگر surfaceCross نیست) -->
+      <!-- Checkbox ها -->
       <div
         v-if="!currentGroup.surfaceCross && applicableItems.length"
         class="check-list"
@@ -250,9 +269,36 @@ function isChecked(group: string, item: StatusItem): boolean {
         </label>
       </div>
 
+      <!-- افزودن سریع -->
+      <div
+        v-if="activeGroup === 'presence'"
+        class="status-extras"
+      >
+        <div class="extras-row">
+          <span class="extras-label">افزودن سریع:</span>
+          <select v-model="selectedExtraId" class="extras-select">
+            <option value="">— انتخاب کنید —</option>
+            <option
+              v-for="opt in STATUS_EXTRAS.options"
+              :key="opt.id"
+              :value="opt.id"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+          <button
+            class="extras-apply"
+            :disabled="!selectedExtraId"
+            @click="applyExtra"
+          >
+            تأیید
+          </button>
+        </div>
+      </div>
+
       <!-- پیام خالی -->
       <div
-        v-if="!currentGroup.surfaceCross && !applicableItems.length && !applicableRadios.length && !applicableSelects.length"
+        v-if="!currentGroup.surfaceCross && !applicableItems.length && !applicableRadios.length && !applicableSelects.length && activeGroup !== 'presence'"
         class="empty-hint"
       >
         گزینه‌ای برای این دندان وجود ندارد
@@ -449,5 +495,60 @@ function isChecked(group: string, item: StatusItem): boolean {
   color: #999;
   padding: 20px;
   font-size: 13px;
+}
+
+.status-extras {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e5e5;
+}
+
+.extras-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.extras-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.extras-select {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.extras-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.extras-apply {
+  padding: 6px 14px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.extras-apply:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
 }
 </style>
