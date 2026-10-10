@@ -10,6 +10,7 @@ import {
   addSession,
   getNextSessionNumber,
   getNextSessionNumberForPatient,
+    saveLastSelection,   // ⭐ جدید
 } from "./treatmentPlanStore";
 import TreatmentForm from "./TreatmentForm.vue";
 
@@ -140,6 +141,13 @@ function onSubmit(payload: {
     finalSessionId = newSess.id;
     finalSessionNumber = newSess.sessionNumber;
     finalSessionTitle = newSess.title;
+
+    // ⭐ بعد از ساخت session، حافظه را با sessionId جلسه‌ی جدید آپدیت کن
+saveLastSelection(props.patientId, {
+  sessionMode: "existing",
+  selectedSessionId: newSess.id,
+  selectedPlanId: payload.planId ?? "",
+});
   }
   // ⭐ حالت existing: sessionId از payload می‌آید،
   //    sessionNumber/sessionTitle در SessionsPanel از planStore خوانده می‌شوند.

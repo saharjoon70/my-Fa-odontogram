@@ -25,6 +25,8 @@ import {
   getNextSessionNumber,
   getNextSessionNumberForPatient,
   getPlanById,
+  getLastSelection,
+  saveLastSelection,
   type TreatmentSession,
 } from "./treatmentPlanStore";
 import {
@@ -35,35 +37,6 @@ import {
 } from "./insuranceStore";
 import StaffSelector from "./StaffSelector.vue";
 import DatePicker from "./DatePicker.vue";
-
-
-// ═══════════════════════════════════════════════
-// ⭐ حافظه‌ی آخرین انتخاب‌ها (در سطح ماژول)
-//    - بین submit‌های مختلف باقی می‌ماند
-//    - بر اساس patientId جدا می‌شود
-// ═══════════════════════════════════════════════
-interface LastSelection {
-  sessionMode: "auto" | "existing" | "new";
-  selectedSessionId: string;
-  selectedPlanId: string;
-}
-
-const lastSelectionByPatient = new Map<string, LastSelection>();
-
-function getLastSelection(patientId: string): LastSelection {
-  return (
-    lastSelectionByPatient.get(patientId) ?? {
-      sessionMode: "auto",
-      selectedSessionId: "",
-      selectedPlanId: "",
-    }
-  );
-}
-
-function saveLastSelection(patientId: string, sel: LastSelection) {
-  lastSelectionByPatient.set(patientId, sel);
-}
-
 
 const props = defineProps<{
   patientId: string;
@@ -83,7 +56,7 @@ const emit = defineEmits<{
       note: string;
       planId?: string;
       planTitle?: string;
-      // ⭐ Session — جدید
+      // ⭐ Session
       sessionMode: "auto" | "existing" | "new";
       sessionId?: string;
       sessionNumber?: number;
@@ -204,7 +177,7 @@ const insuranceProviders = computed(() => getInsuranceProviders());
 const doctors = computed(() => getDoctors());
 const assistants = computed(() => getAssistants());
 
-// ⭐⭐⭐ اینجا (بعد از allPlans و allPatientSessions) — بارگذاری آخرین انتخاب‌ها
+// ⭐ بارگذاری آخرین انتخاب‌ها (بعد از تعریف همه‌ی computedها)
 const lastSel = getLastSelection(props.patientId);
 sessionMode.value = lastSel.sessionMode;
 // بررسی کن جلسه هنوز وجود دارد
@@ -232,7 +205,11 @@ const canSubmit = computed(() => {
   if (selected.value.needsSurface && surfaces.value.length === 0) return false;
   if (selected.value.needsMaterial && !material.value) return false;
   if (mode.value === "planned" && !newPlanTitle.value.trim()) return false;
-  if (mode.value === "done" && sessionMode.value === "existing" && !selectedSessionId.value) {
+  if (
+    mode.value === "done" &&
+    sessionMode.value === "existing" &&
+    !selectedSessionId.value
+  ) {
     return false;
   }
   return true;
@@ -309,7 +286,6 @@ watch(mode, (newMode) => {
 
 // ⭐ اگر طرح عوض شد، جلسه‌ی انتخابی را پاک کن
 watch(selectedPlanId, () => {
-  // اگر جلسه‌ی انتخاب‌شده به این طرح مربوط نیست، پاکش کن
   const sess = selectedSession.value;
   if (sess && sess.planId && sess.planId !== selectedPlanId.value) {
     selectedSessionId.value = "";
@@ -425,7 +401,7 @@ function onSubmit() {
     }
   }
 
-  // ⭐ اطلاعات جلسه — اگر existing، sessionId می‌رود؛ بقیه در TreatmentPanel ساخته می‌شود
+  // ⭐ اطلاعات جلسه
   const sessPayload: {
     sessionMode: "auto" | "existing" | "new";
     sessionId?: string;
@@ -439,7 +415,6 @@ function onSubmit() {
   } else if (sessionMode.value === "new" && newSessionTitle.value.trim()) {
     sessPayload.sessionTitle = newSessionTitle.value.trim();
   }
-  // برای "auto" → هیچ sessionId/sessionTitle نمی‌رود، TreatmentPanel خودش می‌سازد
 
   // ⭐ ذخیره‌ی آخرین انتخاب‌ها برای دفعه‌ی بعد
   saveLastSelection(props.patientId, {

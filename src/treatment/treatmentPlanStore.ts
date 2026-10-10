@@ -272,3 +272,27 @@ export function getSessionCountForPlan(planId: string): number {
   return planStore.sessions.filter((s) => s.planId === planId).length;
 }
 
+// ═══════════════════════════════════════════════
+// ⭐ حافظه‌ی آخرین انتخاب‌های جلسه/طرح (per patient)
+// ═══════════════════════════════════════════════
+export interface LastSelection {
+  sessionMode: "auto" | "existing" | "new";
+  selectedSessionId: string;
+  selectedPlanId: string;
+}
+
+const lastSelectionByPatient = new Map<string, LastSelection>();
+
+export function getLastSelection(patientId: string): LastSelection {
+  return (
+    lastSelectionByPatient.get(patientId) ?? {
+      sessionMode: "auto",
+      selectedSessionId: "",
+      selectedPlanId: "",
+    }
+  );
+}
+
+export function saveLastSelection(patientId: string, sel: LastSelection) {
+  lastSelectionByPatient.set(patientId, sel);
+}
