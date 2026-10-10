@@ -133,11 +133,7 @@ export function getPlanById(planId: string): TreatmentPlan | undefined {
 // Sessions — CRUD
 // ═══════════════════════════════════════════════
 
-export function getNextSessionNumber(planId: string): number {
-  const sessions = planStore.sessions.filter((s) => s.planId === planId);
-  if (sessions.length === 0) return 1;
-  return Math.max(...sessions.map((s) => s.sessionNumber)) + 1;
-}
+
 
 export function addSession(
   session: Omit<TreatmentSession, "id" | "createdAt" | "updatedAt">,
@@ -252,3 +248,27 @@ export function getStaffById(id: string): StaffMember | undefined {
 export const allPlans = computed(() => planStore.plans);
 export const allSessions = computed(() => planStore.sessions);
 export const allStaff = computed(() => planStore.staff);
+
+
+// ═══════════════════════════════════════════════
+// Sessions — CRUD
+// ═══════════════════════════════════════════════
+
+export function getNextSessionNumber(planId: string): number {
+  const sessions = planStore.sessions.filter((s) => s.planId === planId);
+  if (sessions.length === 0) return 1;
+  return Math.max(...sessions.map((s) => s.sessionNumber)) + 1;
+}
+
+// ⭐ تابع جدید: شماره‌ی بعدی جلسه برای کل بیمار (وقتی طرح ندارد)
+export function getNextSessionNumberForPatient(patientId: string): number {
+  const sessions = planStore.sessions.filter((s) => s.patientId === patientId);
+  if (sessions.length === 0) return 1;
+  return Math.max(...sessions.map((s) => s.sessionNumber)) + 1;
+}
+
+// ⭐ تابع جدید: تعداد جلسات یک طرح (برای نمایش «جلسه X از Y»)
+export function getSessionCountForPlan(planId: string): number {
+  return planStore.sessions.filter((s) => s.planId === planId).length;
+}
+

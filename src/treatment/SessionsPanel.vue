@@ -7,6 +7,7 @@ import {
   getStaffById,
   getSessionsForPatient,
   getPlanById,
+  getSessionCountForPlan,
 } from "./treatmentPlanStore";
 import { calculateFinancials } from "./applyTreatment";
 import RadiographDisplay from "./RadiographDisplay.vue";
@@ -16,6 +17,19 @@ const props = defineProps<{
   patientId: string;
 }>();
 
+import EditTreatmentModal from "./EditTreatmentModal.vue";
+
+const showEditModal = ref(false);
+const editingRecordId = ref<string>("");
+
+function openEdit(recordId: string) {
+  editingRecordId.value = recordId;
+  showEditModal.value = true;
+}
+
+function onEditSaved() {
+  refresh();
+}
 const expandedSessionKey = ref<string | null>(null);
 const filterMode = ref<"all" | "upcoming" | "today" | "past">("all");
 const showRadiographs = ref(false);
@@ -64,6 +78,10 @@ interface SessionView {
   status: "scheduled" | "done" | "cancelled";
   planId?: string;
   planTitle?: string;
+  /** ⭐ شماره‌ی جلسه در طرح (فقط اگر طرح دارد) */
+  sessionNumberInPlan?: number;
+  /** ⭐ تعداد کل جلسات طرح (فقط اگر طرح دارد) */
+  planTotalSessions?: number;
   doctorId?: string;
   assistantId?: string;
   doctorName: string;
@@ -77,10 +95,6 @@ interface SessionView {
   doneCount: number;
   plannedCount: number;
   progress: number;
-  // طرح
-  planTotalSessions?: number;
-  planDoneSessions?: number;
-  planProgress?: number;
 }
 
 // ═══════════════════════════════════════════════
@@ -90,88 +104,96 @@ interface SessionView {
 const allSessions = computed<SessionView[]>(() => {
   const sessions = getSessionsForPatient(props.patientId);
 
-  return sessions.map((sess) => {
-    // ⭐ رکوردهای این جلسه
-    const records = getRecordsForPatient(props.patientId).filter((r) => {
-      if (r.kind !== "treatment" && r.kind !== "diagnosis") return false;
-      return (r as TreatmentRecord).sessionId === sess.id;
-    }) as (TreatmentRecord | DiagnosisRecord)[];
+  return sessions
+    .map((sess) => {
+      // ⭐ رکوردهای این جلسه
+      const records = getRecordsForPatient(props.patientId).filter((r) => {
+        if (r.kind !== "treatment" && r.kind !== "diagnosis") return false;
+        return (r as TreatmentRecord).sessionId === sess.id;
+      }) as (TreatmentRecord | DiagnosisRecord)[];
 
-    // ⭐ مالی
-    let totalPrice = 0;
-    let totalDiscount = 0;
-    let totalInsurance = 0;
-    let totalPatient = 0;
-    let totalAfterDiscount = 0;
+      // ⭐ مالی
+      let totalPrice = 0;
+      let totalDiscount = 0;
+      let totalInsurance = 0;
+      let totalPatient = 0;
+      let totalAfterDiscount = 0;
 
-    const sessionTreatments: SessionTreatment[] = records.map((r) => {
-      const rec = r as TreatmentRecord;
-      const fin = calculateFinancials({
-        price: rec.price || 0,
-        discountType: rec.discountType,
-        discountValue: rec.discountValue,
-        insuranceType: rec.insuranceType,
-        insuranceValue: rec.insuranceValue,
+      const sessionTreatments: SessionTreatment[] = records.map((r) => {
+        const rec = r as TreatmentRecord;
+        const fin = calculateFinancials({
+          price: rec.price || 0,
+          discountType: rec.discountType,
+          discountValue: rec.discountValue,
+          insuranceType: rec.insuranceType,
+          insuranceValue: rec.insuranceValue,
+        });
+
+        totalPrice += fin.price;
+        totalDiscount += fin.discountAmount;
+        totalInsurance += fin.insuranceAmount;
+        totalPatient += fin.patientAmount;
+        totalAfterDiscount += fin.afterDiscount;
+
+        return {
+          record: r,
+          label:
+            r.kind === "treatment"
+              ? r.treatmentLabel
+              : r.planLabel ?? r.clinicalDx ?? "تشخیص",
+          doctorName: rec.doctorId
+            ? getStaffById(rec.doctorId)?.name ?? "—"
+            : "—",
+          assistantName: rec.assistantId
+            ? getStaffById(rec.assistantId)?.name ?? "—"
+            : "—",
+          financials: fin,
+        };
       });
 
-      totalPrice += fin.price;
-      totalDiscount += fin.discountAmount;
-      totalInsurance += fin.insuranceAmount;
-      totalPatient += fin.patientAmount;
-      totalAfterDiscount += fin.afterDiscount;
+      const doneCount = records.filter((r) => r.status === "done").length;
+      const plannedCount = records.filter((r) => r.status === "planned").length;
+      const total = records.length;
+      const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+
+      // ⭐ اطلاعات طرح (اگر دارد)
+      const plan = sess.planId ? getPlanById(sess.planId) : undefined;
+      const planTotalSessions = sess.planId
+        ? getSessionCountForPlan(sess.planId)
+        : undefined;
 
       return {
-        record: r,
-        label:
-          r.kind === "treatment"
-            ? r.treatmentLabel
-            : r.planLabel ?? r.clinicalDx ?? "تشخیص",
-        doctorName: rec.doctorId
-          ? getStaffById(rec.doctorId)?.name ?? "—"
+        sessionId: sess.id,
+        sessionNumber: sess.sessionNumber,
+        sessionTitle: sess.title,
+        sessionDate: sess.sessionDate,
+        sessionTime: sess.sessionTime,
+        status: sess.status,
+        planId: sess.planId,
+        planTitle: plan?.title,
+        // ⭐ شماره‌ی جلسه در طرح
+        sessionNumberInPlan: sess.planId ? sess.sessionNumber : undefined,
+        planTotalSessions,
+        doctorId: sess.doctorId,
+        assistantId: sess.assistantId,
+        doctorName: sess.doctorId
+          ? getStaffById(sess.doctorId)?.name ?? "—"
           : "—",
-        assistantName: rec.assistantId
-          ? getStaffById(rec.assistantId)?.name ?? "—"
+        assistantName: sess.assistantId
+          ? getStaffById(sess.assistantId)?.name ?? "—"
           : "—",
-        financials: fin,
+        records: sessionTreatments,
+        totalPrice,
+        totalDiscount,
+        totalInsurance,
+        totalPatient,
+        totalAfterDiscount,
+        doneCount,
+        plannedCount,
+        progress,
       };
-    });
-
-    const doneCount = records.filter((r) => r.status === "done").length;
-    const plannedCount = records.filter((r) => r.status === "planned").length;
-    const total = records.length;
-    const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0;
-
-    // ⭐ اطلاعات طرح
-    const plan = sess.planId ? getPlanById(sess.planId) : undefined;
-
-    return {
-      sessionId: sess.id,
-      sessionNumber: sess.sessionNumber,
-      sessionTitle: sess.title,
-      sessionDate: sess.sessionDate,
-      sessionTime: sess.sessionTime,
-      status: sess.status,
-      planId: sess.planId,
-      planTitle: plan?.title,
-      doctorId: sess.doctorId,
-      assistantId: sess.assistantId,
-      doctorName: sess.doctorId
-        ? getStaffById(sess.doctorId)?.name ?? "—"
-        : "—",
-      assistantName: sess.assistantId
-        ? getStaffById(sess.assistantId)?.name ?? "—"
-        : "—",
-      records: sessionTreatments,
-      totalPrice,
-      totalDiscount,
-      totalInsurance,
-      totalPatient,
-      totalAfterDiscount,
-      doneCount,
-      plannedCount,
-      progress,
-    };
-  }).sort((a, b) => b.sessionDate.localeCompare(a.sessionDate));
+    })
+    .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate));
 });
 
 // ═══════════════════════════════════════════════
@@ -250,6 +272,25 @@ function getStatusClass(status: string): string {
   return status;
 }
 
+// ⭐ عنوان نمایشی جلسه:
+//   - اگر جلسه عنوان سفارشی دارد → همان
+//   - اگر ندارد → «جلسه {شماره}»
+function getSessionDisplayTitle(sess: SessionView): string {
+  return sess.sessionTitle?.trim() || `جلسه ${sess.sessionNumber}`;
+}
+
+// ⭐ برچسب طرح (با «جلسه X از Y»)
+function getPlanBadgeText(sess: SessionView): string {
+  if (!sess.planTitle) return "";
+  if (
+    sess.sessionNumberInPlan != null &&
+    sess.planTotalSessions != null
+  ) {
+    return `${sess.planTitle} (جلسه ${sess.sessionNumberInPlan} از ${sess.planTotalSessions})`;
+  }
+  return sess.planTitle;
+}
+
 function openEditSession(sess: SessionView) {
   editingSessionId.value = sess.sessionId;
   sessionModalPlanId.value = sess.planId || "";
@@ -266,37 +307,53 @@ function onSessionSaved() {
 // ═══════════════════════════════════════════════
 
 function printSession(sess: SessionView) {
+  const sessionDisplayTitle = getSessionDisplayTitle(sess);
+  const planBadge = getPlanBadgeText(sess);
   const html = `
     <!DOCTYPE html>
     <html dir="rtl" lang="fa">
     <head>
       <meta charset="UTF-8">
-      <title>جلسه ${sess.sessionDate}</title>
+      <title>${sessionDisplayTitle} — ${formatDate(sess.sessionDate)}</title>
       <style>
-        body { font-family: Tahoma, sans-serif; padding: 20px; }
-        h1 { font-size: 18px; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
+        body { font-family: Tahoma, sans-serif; padding: 20px; color: #111; }
+        h1 { font-size: 18px; border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 4px; }
         h2 { font-size: 14px; color: #555; margin-top: 16px; }
+        .subtitle { font-size: 12px; color: #666; margin-bottom: 12px; }
         .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; font-size: 12px; }
         .meta div { padding: 6px; background: #f5f5f5; border-radius: 4px; }
+        .plan-box { padding: 8px 10px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: 12px; margin-bottom: 10px; }
+        .plan-box.no-plan { background: #f3f4f6; border-color: #e5e7eb; color: #6b7280; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
         th { background: #2563eb; color: #fff; }
         .total { margin-top: 16px; padding: 12px; background: #eff6ff; border-radius: 6px; }
         .total-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .total-row.bold { font-weight: bold; border-top: 1px solid #2563eb; padding-top: 6px; margin-top: 6px; }
+        .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #999; }
       </style>
     </head>
     <body>
-      <h1>📅 ${formatDate(sess.sessionDate)} ${sess.sessionTime ? `- ${sess.sessionTime}` : ""}</h1>
+      <h1>📅 ${sessionDisplayTitle}</h1>
+      <div class="subtitle">${formatDate(sess.sessionDate)}${sess.sessionTime ? ` — ساعت ${sess.sessionTime}` : ""}</div>
+
+      ${
+        sess.planTitle
+          ? `<div class="plan-box"><strong>📋 طرح درمان:</strong> ${planBadge}</div>`
+          : `<div class="plan-box no-plan"><strong>📋 طرح درمان:</strong> ندارد (جلسه مستقل)</div>`
+      }
+
       <div class="meta">
-        ${sess.planTitle ? `<div><strong>طرح:</strong> ${sess.planTitle}</div>` : ""}
-        ${sess.sessionNumber ? `<div><strong>جلسه:</strong> ${sess.sessionNumber}</div>` : ""}
         <div><strong>دکتر:</strong> ${sess.doctorName}</div>
         <div><strong>دستیار:</strong> ${sess.assistantName}</div>
+        <div><strong>شماره جلسه:</strong> ${sess.sessionNumber}</div>
+        <div><strong>وضعیت:</strong> ${getStatusLabel(sess.status)}</div>
       </div>
 
       <h2>درمان‌ها (${sess.records.length})</h2>
-      <table>
+      ${
+        sess.records.length > 0
+          ? `<table>
         <thead>
           <tr>
             <th>دندان</th>
@@ -309,28 +366,51 @@ function printSession(sess: SessionView) {
           </tr>
         </thead>
         <tbody>
-          ${sess.records.map((r) => `
+          ${sess.records
+            .map(
+              (r) => `
             <tr>
               <td>#${r.record.toothNo}</td>
               <td>${r.label}</td>
               <td>${r.record.status === "done" ? "انجام‌شده" : "طرح"}</td>
               <td>${formatPrice(r.financials.price)}</td>
-              <td>${r.financials.discountAmount > 0 ? "- " + formatPrice(r.financials.discountAmount) : "—"}</td>
-              <td>${r.financials.insuranceAmount > 0 ? formatPrice(r.financials.insuranceAmount) : "—"}</td>
+              <td>${
+                r.financials.discountAmount > 0
+                  ? "- " + formatPrice(r.financials.discountAmount)
+                  : "—"
+              }</td>
+              <td>${
+                r.financials.insuranceAmount > 0
+                  ? formatPrice(r.financials.insuranceAmount)
+                  : "—"
+              }</td>
               <td>${formatPrice(r.financials.patientAmount)}</td>
             </tr>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </tbody>
-      </table>
+      </table>`
+          : `<div style="padding:12px;text-align:center;color:#999;font-size:12px;">هنوز درمانی ثبت نشده</div>`
+      }
 
       <div class="total">
         <div class="total-row"><span>جمع کل:</span><span>${formatPrice(sess.totalPrice)}</span></div>
-        ${sess.totalDiscount > 0 ? `<div class="total-row"><span>تخفیف:</span><span>- ${formatPrice(sess.totalDiscount)}</span></div>` : ""}
-        ${sess.totalInsurance > 0 ? `<div class="total-row"><span>سهم بیمه:</span><span>${formatPrice(sess.totalInsurance)}</span></div>` : ""}
+        ${
+          sess.totalDiscount > 0
+            ? `<div class="total-row"><span>تخفیف:</span><span>- ${formatPrice(sess.totalDiscount)}</span></div>`
+            : ""
+        }
+        <div class="total-row"><span>بعد از تخفیف:</span><span>${formatPrice(sess.totalAfterDiscount)}</span></div>
+        ${
+          sess.totalInsurance > 0
+            ? `<div class="total-row"><span>سهم بیمه:</span><span>${formatPrice(sess.totalInsurance)}</span></div>`
+            : ""
+        }
         <div class="total-row bold"><span>سهم بیمار:</span><span>${formatPrice(sess.totalPatient)}</span></div>
       </div>
 
-      <div style="margin-top: 20px; text-align: center; font-size: 11px; color: #999;">
+      <div class="footer">
         تاریخ چاپ: ${new Date().toLocaleDateString("fa-IR")}
       </div>
     </body>
@@ -348,10 +428,7 @@ function printSession(sess: SessionView) {
 </script>
 
 <template>
-  <div
-    class="sessions-panel"
-    dir="rtl"
-  >
+  <div class="sessions-panel" dir="rtl">
     <!-- Header -->
     <div class="panel-header">
       <h3>📅 جلسات</h3>
@@ -364,10 +441,7 @@ function printSession(sess: SessionView) {
     </div>
 
     <!-- Radiographs -->
-    <div
-      v-if="showRadiographs"
-      class="rad-wrapper"
-    >
+    <div v-if="showRadiographs" class="rad-wrapper">
       <RadiographDisplay :patient-id="patientId" />
     </div>
 
@@ -400,24 +474,16 @@ function printSession(sess: SessionView) {
     </div>
 
     <!-- Empty -->
-    <div
-      v-if="sessions.length === 0"
-      class="empty-state"
-    >
-      <div class="empty-icon">
-        📅
-      </div>
+    <div v-if="sessions.length === 0" class="empty-state">
+      <div class="empty-icon">📅</div>
       <div>هیچ جلسه‌ای در این فیلتر نیست</div>
       <div class="empty-hint">
-        از تب «طرح درمان» جلسه بساز
+        از تب «درمان / طرح» یک درمان ثبت کن — جلسه خودکار ساخته می‌شود
       </div>
     </div>
 
     <!-- Sessions List -->
-    <div
-      v-else
-      class="sessions-list"
-    >
+    <div v-else class="sessions-list">
       <div
         v-for="sess in sessions"
         :key="sess.sessionId"
@@ -449,25 +515,27 @@ function printSession(sess: SessionView) {
           </div>
           <div class="session-info">
             <div class="session-title">
-              {{ formatDate(sess.sessionDate) }}
-              <span
-                v-if="sess.sessionTime"
-                class="time-badge"
-              >
+              <strong>{{ getSessionDisplayTitle(sess) }}</strong>
+              <span class="session-date-inline">
+                — {{ formatDate(sess.sessionDate) }}
+              </span>
+              <span v-if="sess.sessionTime" class="time-badge">
                 🕐 {{ sess.sessionTime }}
               </span>
+
+              <!-- ⭐ برچسب طرح -->
               <span
                 v-if="sess.planTitle"
                 class="plan-badge"
+                :title="getPlanBadgeText(sess)"
               >
-                📋 {{ sess.planTitle }}
-                <span v-if="sess.sessionNumber">
-                  (جلسه {{ sess.sessionNumber }})
-                </span>
+                📋 {{ getPlanBadgeText(sess) }}
               </span>
-              <span
-                :class="['status-badge-mini', sess.status]"
-              >
+              <span v-else class="plan-badge no-plan">
+                📋 بدون طرح
+              </span>
+
+              <span :class="['status-badge-mini', sess.status]">
                 {{ getStatusLabel(sess.status) }}
               </span>
             </div>
@@ -475,16 +543,10 @@ function printSession(sess: SessionView) {
               <span class="meta-item">
                 🛠 {{ sess.records.length }} مورد
               </span>
-              <span
-                v-if="sess.doctorName !== '—'"
-                class="meta-item"
-              >
+              <span v-if="sess.doctorName !== '—'" class="meta-item">
                 👨‍⚕️ {{ sess.doctorName }}
               </span>
-              <span
-                v-if="sess.assistantName !== '—'"
-                class="meta-item"
-              >
+              <span v-if="sess.assistantName !== '—'" class="meta-item">
                 👤 {{ sess.assistantName }}
               </span>
             </div>
@@ -520,10 +582,7 @@ function printSession(sess: SessionView) {
           </div>
 
           <!-- Treatments Table -->
-          <table
-            v-if="sess.records.length > 0"
-            class="data-table"
-          >
+          <table v-if="sess.records.length > 0" class="data-table">
             <thead>
               <tr>
                 <th>دندان</th>
@@ -535,6 +594,7 @@ function printSession(sess: SessionView) {
                 <th>تخفیف</th>
                 <th>بیمه</th>
                 <th>سهم بیمار</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -578,13 +638,19 @@ function printSession(sess: SessionView) {
                 <td class="patient-cell">
                   {{ formatPrice(item.financials.patientAmount) }}
                 </td>
+                <td class="actions-cell">
+                  <button
+                    class="btn-icon-sm"
+                    @click="openEdit(item.record.id)"
+                    title="ویرایش"
+                  >
+                    ✏️
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
-          <div
-            v-else
-            class="empty-records"
-          >
+          <div v-else class="empty-records">
             هنوز درمانی به این جلسه اضافه نشده
           </div>
 
@@ -620,10 +686,7 @@ function printSession(sess: SessionView) {
 
           <!-- Actions -->
           <div class="session-actions">
-            <button
-              class="btn-print"
-              @click="printSession(sess)"
-            >
+            <button class="btn-print" @click="printSession(sess)">
               🖨 چاپ جلسه
             </button>
             <button
@@ -646,6 +709,13 @@ function printSession(sess: SessionView) {
       :session-id="editingSessionId"
       @close="showSessionModal = false"
       @saved="onSessionSaved"
+    />
+    <EditTreatmentModal
+      :open="showEditModal"
+      :patient-id="patientId"
+      :record-id="editingRecordId"
+      @close="showEditModal = false"
+      @saved="onEditSaved"
     />
   </div>
 </template>
@@ -817,6 +887,12 @@ function printSession(sess: SessionView) {
   align-items: center;
 }
 
+.session-date-inline {
+  font-weight: 400;
+  color: #6b7280;
+  font-size: 11px;
+}
+
 .time-badge {
   font-size: 10px;
   padding: 1px 6px;
@@ -833,6 +909,11 @@ function printSession(sess: SessionView) {
   color: #92400e;
   border-radius: 10px;
   font-weight: 600;
+}
+
+.plan-badge.no-plan {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .status-badge-mini {
@@ -995,6 +1076,24 @@ function printSession(sess: SessionView) {
   color: #059669;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.actions-cell {
+  width: 30px;
+  text-align: center;
+}
+
+.btn-icon-sm {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.btn-icon-sm:hover {
+  background: #f3f4f6;
 }
 
 .financial-summary {

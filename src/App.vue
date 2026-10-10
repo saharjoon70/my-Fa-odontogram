@@ -39,6 +39,8 @@ import { applyThemeConfig, type OdontogramThemeConfig } from "./theme";
 import type { OdontogramPlugin } from "./plugin";
 import TreatmentTabs from "./treatment/TreatmentTabs.vue";
 import { recomputeToothState } from "./treatment/applyTreatment";
+import { getRecordsForPatient } from "./treatment/treatmentStore";
+import type { TreatmentRecord } from "./treatment/treatmentStore";
 
 const props = withDefaults(
   defineProps<{
@@ -141,6 +143,31 @@ const PATIENTS = [
 
 const selectedTeeth = ref<number[]>([]);
 
+// ⭐ لیست درمان‌های دندان‌های انتخاب‌شده
+const selectedTreatments = computed(() => {
+  const all: TreatmentRecord[] = [];
+  for (const toothNo of selectedTeeth.value) {
+    const records = getRecordsForPatient(patientId.value).filter(
+      (r): r is TreatmentRecord =>
+        r.kind === "treatment" && r.toothNo === toothNo,
+    );
+    all.push(...records);
+  }
+  return all.sort((a, b) => b.date.localeCompare(a.date));
+});
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("fa-IR");
+  } catch {
+    return iso;
+  }
+}
+
+function formatPrice(n: number): string {
+  return n.toLocaleString("fa-IR") + " ت";
+}
+
 function selectAll() {
   setOdonSelectedTeeth([
     18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
@@ -162,6 +189,12 @@ function selectLower() {
 
 function clearSelection() {
   clearOdonSelection();
+}
+
+function resetAll() {
+  const btn = document.getElementById("btnResetAll");
+  if (btn) (btn as HTMLButtonElement).click();
+  clearSelection();
 }
 
 let stateUnsubscribe: (() => void) | undefined;
@@ -199,19 +232,7 @@ function toggleDark() {
   document.documentElement.classList.toggle("dark", next);
   emit("darkModeChange", next);
 }
-function resetAll() {
-  // ⭐ بازنشانی کامل دهان
-  const btn = document.getElementById("btnResetAll");
-  if (btn) (btn as HTMLButtonElement).click();
-  // ⭐ انتخاب رو هم پاک کن
-  clearSelection();
-}
 
-function resetToPermanent() {
-  // ⭐ برگشت به حالت دائمی (reset all)
-  const btn = document.getElementById("btnResetAll");
-  if (btn) (btn as HTMLButtonElement).click();
-}
 function setNumbering(next: NumberingSystem) {
   if (props.numberingSystem) {
     emit("numberingChange", next);
@@ -268,6 +289,7 @@ watch(() => props.themeConfig, (v) => applyThemeConfig(themeRootRef.value, v), {
 watch(() => props.plugins, (v) => registerPlugins(v ?? []), { immediate: true, deep: true });
 watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true });
 </script>
+
 <template>
   <div ref="themeRootRef" class="dental-app" dir="rtl">
     <header class="topbar">
@@ -310,33 +332,23 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
         <div class="panel-head">
           <h3>انتخاب دندان</h3>
 
-      <div class="filter-buttons">
-  <button @click="selectAll" :class="{ active: selectedTeeth.length === 32 }">
-    همه
-  </button>
-  <button @click="selectUpper">فک بالا</button>
-  <button @click="selectLower">فک پایین</button>
-
-  <!-- ⭐ بازنشانی کامل (جای پاک کردن) -->
-  <button @click="resetAll" class="btn-reset">بازنشانی</button>
-
-
-
-  <!-- ⭐ شیری -->
-  <button id="btnPrimaryDentition" type="button" title="دندان‌های شیری">
-    شیری
-  </button>
-
-  <!-- ⭐ مختلط -->
-  <button id="btnMixedDentition" type="button" title="دندان مختلط">
-    مختلط
-  </button>
-
-  <!-- ⭐ بی‌دندانی -->
-  <button id="btnEdentulous" type="button" title="بی‌دندانی" aria-pressed="false">
-    بی‌دندانی
-  </button>
-</div>
+          <div class="filter-buttons">
+            <button @click="selectAll" :class="{ active: selectedTeeth.length === 32 }">
+              همه
+            </button>
+            <button @click="selectUpper">فک بالا</button>
+            <button @click="selectLower">فک پایین</button>
+            <button @click="resetAll" class="btn-reset">بازنشانی</button>
+            <button id="btnPrimaryDentition" type="button" title="دندان‌های شیری">
+              شیری
+            </button>
+            <button id="btnMixedDentition" type="button" title="دندان مختلط">
+              مختلط
+            </button>
+            <button id="btnEdentulous" type="button" title="بی‌دندانی" aria-pressed="false">
+              بی‌دندانی
+            </button>
+          </div>
 
           <div class="chart-actions">
             <button
@@ -378,12 +390,44 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
               data-icon-src="data:image/svg+xml,%3c?xml%20version='1.0'%20encoding='UTF-8'?%3e%3csvg%20id='Layer_1'%20xmlns='http://www.w3.org/2000/svg'%20version='1.1'%20viewBox='0%200%20256%20256'%3e%3c!--%20Created%20by%20Zoltan%20Dul%20in%202026%20-%20free%20to%20use%20with%20MIT%20license.%20SVG%20Version:%202.1.1%20--%3e%3cpath%20id='tooth-base'%20d='M122.9,152.7c-7.3-2-11.8,14.6-14.2,20.4-1.6,4.4-3.1,8.3-4.3,12.7-4.4,16.1-1.6,34.3-6.8,50.3-3.5,12.7-15.3,14.4-21.2,2.2-2.9-6.1-3.9-12.9-4.8-19.6-1-7.7-.8-15.6.7-23.1,1.8-11.4,7.5-22,7.5-33.8,0-17.2-3-32.7-6.7-49.2-8.4-29.3-27.4-79.6,13.2-93.9,12.3-4.9,25,3.3,37.5,3,1.7,0,3.4-.2,5.1-.4,12.9-2.1,27.7-9.6,41-5.3,22.5,7.4,20.6,39.1,16.6,58.5-1,4.8-2.3,9.4-3.6,13.2-2.2,6.2-5.3,12.2-6.7,19.1-1.9,8.4-2.9,16.8-3.7,25-1.5,15.5.3,30.4.5,45.1,0,8.7-.4,17.8-1.2,26.3-.8,8.3-2.5,16.7-4.5,24.9-1.7,7.8-5.6,18.9-14.1,20.5-14.8.7-11.9-38.8-14.3-48.9-1.8-10.1-6.8-42.3-15.9-47.4h0v.4Z'%20style='fill:%20%23fff;%20stroke:%20%23000;%20stroke-miterlimit:%2010;%20stroke-width:%208px;'/%3e%3cpath%20id='tooth-healthy-pulp-2'%20d='M155.3,232.3c-4.8-3.6.2-21-1.5-34.3.2-18.4-2.8-39.4-11.5-55.3-4.4-6.7-8.3-11.3-15.4-11.9-5.3-1.1-11.5,0-15.5,2.9-12,9.1-20.8,47.4-22.7,68.3-.9,6.1-2.1,38.8-7.7,16.8-4.7-20.5,4.3-34.2,7.1-56.2,5-17.3,12.3-36.7,9.8-61.3-1.6-14.8-7.3-32.8-10.3-46.6-2.5-13.8,4.5-13.3,16.5-7,8.8,3.7,15.4,12.4,26.1,10.4,16-3.4,27.7-19.7,33-16.6,2.2,1,3,9.7,2.1,11.8-2.8,13.8-7.8,28.1-9.2,41.8-1,14.8.6,30.2,2.3,45.5,1.6,14.8,10.3,88.5-3.4,93h0v-1.5s.5,0,.5,0Z'%20style='fill:%20%23fcc5bc;'/%3e%3cg%20id='x-line'%20style='display:%20none;'%3e%3cline%20id='line-2'%20x1='18.3'%20y1='22.1'%20x2='226.9'%20y2='230.7'%20style='fill:%20none;%20stroke:%20%23ef4444;%20stroke-linecap:%20round;%20stroke-width:%2014px;'/%3e%3cline%20id='line-1'%20x1='18.3'%20y1='22.1'%20x2='226.9'%20y2='230.7'%20style='fill:%20none;%20isolation:%20isolate;%20opacity:%20.2;%20stroke:%20%23111827;%20stroke-linecap:%20round;%20stroke-width:%203px;'/%3e%3c/g%3e%3c/svg%3e"
               data-xline="1"
             ></button>
-
-
           </div>
         </div>
 
         <div id="toothGrid" class="tooth-grid"></div>
+
+        <!-- ⭐ توضیحات و جزئیات درمان‌های دندان‌های انتخاب‌شده -->
+        <div v-if="selectedTeeth.length > 0" class="tooth-treatments-info">
+          <div class="summary-header">
+            <span>📋 درمان‌های دندان انتخاب‌شده:</span>
+            <span class="count">{{ selectedTreatments.length }} مورد</span>
+          </div>
+          <ul v-if="selectedTreatments.length > 0" class="treatments-list">
+            <li
+              v-for="rec in selectedTreatments"
+              :key="rec.id"
+              class="treatment-item"
+            >
+              <span class="tooth-badge">#{{ rec.toothNo }}</span>
+              <span class="treatment-label">{{ rec.treatmentLabel }}</span>
+              <span v-if="rec.surface" class="treatment-tag">
+                {{ rec.surface }}
+              </span>
+              <span v-if="rec.material" class="treatment-tag">
+                {{ rec.material }}
+              </span>
+              <span :class="['status-badge', rec.status]">
+                {{ rec.status === "done" ? "✅ انجام" : "⏳ طرح" }}
+              </span>
+              <span v-if="rec.price" class="treatment-price">
+                {{ formatPrice(rec.price) }}
+              </span>
+              <span class="treatment-date">{{ formatDate(rec.date) }}</span>
+            </li>
+          </ul>
+          <div v-else class="empty-treatments">
+            هنوز درمانی برای این دندان‌ها ثبت نشده
+          </div>
+        </div>
       </section>
 
       <section class="panel treatment-panel-wrapper">
@@ -529,8 +573,6 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
 </template>
 
 <style scoped>
-
-
 .dental-app {
   min-height: 100vh;
   background: #f5f5f5;
@@ -621,21 +663,15 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 .panel-head h3 {
   margin: 0;
   font-size: 14px;
-}
-
-.selected-info {
-  font-size: 12px;
-  color: #2563eb;
-  padding: 4px 10px;
-  background: #eff6ff;
-  border-radius: 6px;
-  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .filter-buttons {
@@ -644,6 +680,8 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
   flex-wrap: wrap;
   margin-bottom: 10px;
   flex-shrink: 0;
+  flex: 1;
+  justify-content: center;
 }
 
 .filter-buttons button {
@@ -668,69 +706,25 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
   border-color: #2563eb;
 }
 
-.treatment-panel-wrapper {
-  grid-column: 2;
-  padding: 12px;
-  overflow: hidden;
+/* ⭐ دکمه‌ی بازنشانی — قرمز کم‌رنگ */
+.filter-buttons .btn-reset {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
-/* ⭐ فقط این یک خط */
-#toothGrid {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  margin-top: 8px;
+.filter-buttons .btn-reset:hover {
+  background: #fecaca;
+  border-color: #ef4444;
 }
 
-@media (max-width: 900px) {
-  .main-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-    overflow: auto;
-  }
-  .filter-panel,
-  .treatment-panel-wrapper {
-    grid-column: 1;
-    grid-row: auto;
-    min-height: 400px;
-  }
-}
-
-
-
-
-
-
-
-
-
-
-
-.panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.panel-head h3 {
-  margin: 0;
-  font-size: 14px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* ⭐ chart-actions — وسط panel-head */
 .chart-actions {
   display: flex;
   gap: 4px;
   align-items: center;
-  flex: 1;
-  justify-content: center;
+  flex-shrink: 0;
 }
 
-/* ⭐ دکمه‌های icon — همون استایل اصلی upstream */
 .btn-icon {
   padding: 6px;
   min-width: 32px;
@@ -766,7 +760,6 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
   opacity: 0.5;
 }
 
-/* ⭐ دکمه toggle برای هماهنگی */
 .btn-toggle[aria-pressed="true"] {
   background: #eff6ff;
   border-color: #93c5fd;
@@ -781,16 +774,145 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
   background: rgba(0, 0, 0, 0.04);
 }
 
-/* selected-info کوچیک‌تر */
-.selected-info {
+.treatment-panel-wrapper {
+  grid-column: 2;
+  padding: 12px;
+  overflow: hidden;
+}
+
+#toothGrid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+
+/* ⭐ توضیحات و جزئیات درمان‌ها */
+.tooth-treatments-info {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 12px;
-  color: #2563eb;
-  padding: 4px 10px;
-  background: #eff6ff;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.summary-header .count {
+  padding: 1px 8px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+.treatments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.treatment-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #fff;
   border-radius: 6px;
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-size: 11px;
+  color: #1f2937;
+  border-right: 3px solid #2563eb;
+  flex-wrap: wrap;
+}
+
+.tooth-badge {
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.treatment-label {
+  font-weight: 600;
+  color: #111827;
+}
+
+.treatment-tag {
+  padding: 1px 6px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  font-size: 9px;
+  color: #4b5563;
+}
+
+.status-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.status-badge.done {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.planned {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.treatment-price {
+  margin-right: auto;
+  color: #059669;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.treatment-date {
+  color: #9ca3af;
+  font-size: 10px;
+}
+
+.empty-treatments {
+  text-align: center;
+  padding: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  background: #fff;
+  border: 1px dashed #e5e7eb;
+  border-radius: 6px;
+}
+
+@media (max-width: 900px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    overflow: auto;
+  }
+  .filter-panel,
+  .treatment-panel-wrapper {
+    grid-column: 1;
+    grid-row: auto;
+    min-height: 400px;
+  }
 }
 
 /* موبایل: chart-actions کوچیک‌تر */
@@ -811,19 +933,5 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
   .panel-head h3 {
     font-size: 12px;
   }
-}
-
-
-
-/* ⭐ دکمه‌ی بازنشانی — قرمز کم‌رنگ */
-.filter-buttons .btn-reset {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #991b1b;
-}
-
-.filter-buttons .btn-reset:hover {
-  background: #fecaca;
-  border-color: #ef4444;
 }
 </style>

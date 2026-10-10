@@ -226,6 +226,8 @@ export function submitTreatment(
     planId?: string;
     planTitle?: string;
     sessionId?: string;
+    sessionNumber?: number;
+    sessionTitle?: string;
     sessionDate?: string;
     sessionTime?: string;
     doctorId?: string;
