@@ -38,6 +38,7 @@ import type { NumberingSystem } from "./utils/numbering";
 import { applyThemeConfig, type OdontogramThemeConfig } from "./theme";
 import type { OdontogramPlugin } from "./plugin";
 import TreatmentTabs from "./treatment/TreatmentTabs.vue";
+import PatientHistory from "./treatment/PatientHistory.vue";
 import { recomputeToothState } from "./treatment/applyTreatment";
 import { getRecordsForPatient } from "./treatment/treatmentStore";
 import type { TreatmentRecord } from "./treatment/treatmentStore";
@@ -142,6 +143,7 @@ const PATIENTS = [
 ];
 
 const selectedTeeth = ref<number[]>([]);
+const historyOpen = ref(false);
 
 // ⭐ لیست درمان‌های دندان‌های انتخاب‌شده
 const selectedTreatments = computed(() => {
@@ -302,6 +304,13 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
       </div>
 
       <div class="topbar-actions">
+                <button
+          class="btn-theme"
+          title="پیشینه درمانی"
+          @click="historyOpen = true"
+        >
+          📜
+        </button>
         <select v-model="patientId" class="patient-select" title="بیمار">
           <option v-for="p in PATIENTS" :key="p.id" :value="p.id">
             {{ p.name }}
@@ -570,6 +579,12 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
       @close="settingsOpen = false"
     />
   </div>
+      <PatientHistory
+      :open="historyOpen"
+      :patient-id="patientId"
+      :patient-name="PATIENTS.find((p) => p.id === patientId)?.name"
+      @close="historyOpen = false"
+    />
 </template>
 
 <style scoped>

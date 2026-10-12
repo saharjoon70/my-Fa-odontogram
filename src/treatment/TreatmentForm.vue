@@ -13,7 +13,6 @@ import { getTreatmentIcon } from "./treatmentIcons";
 import {
   previewTreatmentItem,
   resetToothToStoredState,
-
 } from "./applyTreatment";
 import {
   getPlansForPatient,
@@ -25,8 +24,6 @@ import {
   getNextSessionNumber,
   getNextSessionNumberForPatient,
   getPlanById,
-  getLastSelection,
-  saveLastSelection,
   type TreatmentSession,
 } from "./treatmentPlanStore";
 import {
@@ -64,7 +61,7 @@ const emit = defineEmits<{
       assistantId?: string;
       date: string;
       time: string;
-      // ⭐ مالی جلسه (روی کل جلسه)
+      // ⭐ مالی جلسه
       discountType?: "percent" | "amount";
       discountValue?: number;
       discountReason?: string;
@@ -174,26 +171,60 @@ const insuranceProviders = computed(() => getInsuranceProviders());
 const doctors = computed(() => getDoctors());
 const assistants = computed(() => getAssistants());
 
-// ⭐ بارگذاری آخرین انتخاب‌ها
-const lastSel = getLastSelection(props.patientId);
-sessionMode.value = lastSel.sessionMode;
-if (
-  lastSel.selectedSessionId &&
-  allPatientSessions.value.some((s) => s.id === lastSel.selectedSessionId)
-) {
-  selectedSessionId.value = lastSel.selectedSessionId;
-} else {
-  selectedSessionId.value = "";
-  if (sessionMode.value === "existing") sessionMode.value = "auto";
-}
-if (
-  lastSel.selectedPlanId &&
-  allPlans.value.some((p) => p.id === lastSel.selectedPlanId)
-) {
-  selectedPlanId.value = lastSel.selectedPlanId;
-} else {
-  selectedPlanId.value = "";
-}
+// ⭐ پیش‌فرض: جلسه‌ی جدید خودکار
+// (اگر جلسه‌ای ثبت شد، watch زیر خودکار به آن سوئیچ می‌کند)
+sessionMode.value = "auto" as "auto" | "existing" | "new";
+selectedSessionId.value = "";
+
+// ⭐ وقتی جلسه‌ی جدیدی برای این بیمار اضافه شد (در همین نشست)،
+//    به‌طور خودکار به آن سوئیچ کن
+watch(
+  () => allPatientSessions.value.length,
+  (newLen, oldLen) => {
+    // فقط اگر جلسه اضافه شد (نه حذف)
+    if (newLen > (oldLen ?? 0) && allPatientSessions.value.length > 0) {
+      // جدیدترین جلسه بر اساس createdAt
+      const newest = [...allPatientSessions.value].sort(
+        (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0),
+      )[0];
+      if (newest) {
+        sessionMode.value = "existing";
+        selectedSessionId.value = newest.id;
+        // طرح جلسه اگر داشت
+        if (newest.planId) {
+          selectedPlanId.value = newest.planId;
+        }
+        // تخفیف جلسه
+        if (newest.discountType && newest.discountValue) {
+          hasDiscount.value = true;
+          discountType.value = newest.discountType;
+          discountValue.value = newest.discountValue;
+          discountReason.value = newest.discountReason ?? "";
+        } else {
+          hasDiscount.value = false;
+          discountValue.value = 0;
+          discountReason.value = "";
+        }
+        // بیمه جلسه
+        if (
+          newest.insuranceType &&
+          newest.insuranceType !== "none" &&
+          newest.insuranceValue
+        ) {
+          hasInsurance.value = true;
+          insuranceType.value =
+            newest.insuranceType === "amount" ? "amount" : "percent";
+          insuranceValue.value = newest.insuranceValue;
+          insuranceName.value = newest.insuranceName ?? "";
+        } else {
+          hasInsurance.value = false;
+          insuranceValue.value = 0;
+          insuranceName.value = "";
+        }
+      }
+    }
+  },
+);
 
 const canSubmit = computed(() => {
   if (!selected.value) return false;
@@ -209,8 +240,6 @@ const canSubmit = computed(() => {
   }
   return true;
 });
-
-
 
 // ═══ Preview ═══
 function refreshPreview() {
@@ -243,7 +272,6 @@ watch(selectedSession, (sess) => {
     discountType.value = sess.discountType;
     discountValue.value = sess.discountValue;
     discountReason.value = sess.discountReason ?? "";
-    // اگر preset مطابقت داشت، آن را فعال کن
     const matchPreset = DISCOUNT_PRESETS.find(
       (p) => p.type === sess.discountType && p.value === sess.discountValue,
     );
@@ -255,9 +283,14 @@ watch(selectedSession, (sess) => {
     discountReason.value = "";
     selectedDiscountPreset.value = "none";
   }
-  if (sess.insuranceType && sess.insuranceType !== "none" && sess.insuranceValue) {
+  if (
+    sess.insuranceType &&
+    sess.insuranceType !== "none" &&
+    sess.insuranceValue
+  ) {
     hasInsurance.value = true;
-    insuranceType.value = sess.insuranceType === "amount" ? "amount" : "percent";
+    insuranceType.value =
+      sess.insuranceType === "amount" ? "amount" : "percent";
     insuranceValue.value = sess.insuranceValue;
     insuranceName.value = sess.insuranceName ?? "";
   } else {
@@ -276,10 +309,7 @@ watch(mode, (newMode) => {
     newSessionTitle.value = "";
   } else {
     newPlanTitle.value = "";
-    const last = getLastSelection(props.patientId);
-    sessionMode.value = last.sessionMode;
-    selectedSessionId.value = last.selectedSessionId;
-    selectedPlanId.value = last.selectedPlanId;
+    // ⭐ از lastSelection نمی‌خوانیم
   }
 });
 
@@ -415,32 +445,25 @@ function onSubmit() {
     sessPayload.sessionTitle = newSessionTitle.value.trim();
   }
 
-  // ⭐ ذخیره‌ی آخرین انتخاب‌ها
-  saveLastSelection(props.patientId, {
-    sessionMode: sessionMode.value,
-    selectedSessionId: selectedSessionId.value,
-    selectedPlanId: selectedPlanId.value,
-  });
-
   // ⭐ مالی جلسه (فقط در mode=done)
-const financialPayload: {
-  discountType?: "percent" | "amount";
-  discountValue?: number;
-  discountReason?: string;
-  insuranceType?: "percent" | "amount" | "none";
-  insuranceValue?: number;
-  insuranceName?: string;
-} =
-  mode.value === "done"
-    ? {
-        discountType: hasDiscount.value ? discountType.value : undefined,
-        discountValue: hasDiscount.value ? discountValue.value : undefined,
-        discountReason: hasDiscount.value ? discountReason.value : undefined,
-        insuranceType: hasInsurance.value ? insuranceType.value : "none",
-        insuranceValue: hasInsurance.value ? insuranceValue.value : undefined,
-        insuranceName: hasInsurance.value ? insuranceName.value : undefined,
-      }
-    : {};
+  const financialPayload: {
+    discountType?: "percent" | "amount";
+    discountValue?: number;
+    discountReason?: string;
+    insuranceType?: "percent" | "amount" | "none";
+    insuranceValue?: number;
+    insuranceName?: string;
+  } =
+    mode.value === "done"
+      ? {
+          discountType: hasDiscount.value ? discountType.value : undefined,
+          discountValue: hasDiscount.value ? discountValue.value : undefined,
+          discountReason: hasDiscount.value ? discountReason.value : undefined,
+          insuranceType: hasInsurance.value ? insuranceType.value : "none",
+          insuranceValue: hasInsurance.value ? insuranceValue.value : undefined,
+          insuranceName: hasInsurance.value ? insuranceName.value : undefined,
+        }
+      : {};
 
   emit("submit", {
     treatmentId: selected.value.id,

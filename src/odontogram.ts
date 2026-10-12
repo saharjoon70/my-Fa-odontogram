@@ -5041,6 +5041,18 @@ export function buildOdontogramSvg(): { xml: string; width: number; height: numb
   return { xml: `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`, width: W, height: H };
 }
 
+// ⭐ NEW: return the odontogram SVG as a string (no download).
+// Used by PatientHistory.vue to embed the chart inline in a modal.
+export function buildOdontogramSvgString(): {
+  xml: string;
+  width: number;
+  height: number;
+} | null {
+  return buildOdontogramSvg();
+}
+
+
+
 /** Export the odontogram as a downloadable, scalable SVG file. */
 export async function exportSvg(){
   if(exportInProgress) return;
