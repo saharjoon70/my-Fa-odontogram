@@ -14,6 +14,8 @@ import {
   previewTreatmentItem,
   resetToothToStoredState,
 } from "./applyTreatment";
+import { setToothStateAndRender } from "../odontogram";
+import { getRecordsForTooth } from "./treatmentStore";
 import {
   getPlansForPatient,
   getSessionsForPatient,
@@ -244,9 +246,20 @@ const canSubmit = computed(() => {
 // ═══ Preview ═══
 function refreshPreview() {
   if (props.toothNos.length === 0) return;
+
+  // ⭐ 1. ریست کامل state دندان‌ها
+  for (const toothNo of props.toothNos) {
+    setToothStateAndRender(toothNo, getEmptyToothState(), {
+      replaceCustomStates: true,   // ⭐ مهم
+    });
+  }
+
+  // ⭐ 2. برگرداندن رکوردهای ذخیره‌شده
   for (const toothNo of props.toothNos) {
     resetToothToStoredState(props.patientId, toothNo);
   }
+
+  // ⭐ 3. اعمال preview درمان انتخاب‌شده
   if (!selected.value) return;
   for (const toothNo of props.toothNos) {
     previewTreatmentItem(toothNo, selected.value, {
@@ -255,6 +268,61 @@ function refreshPreview() {
     });
   }
 }
+
+// ⭐ state خالی برای ریست
+function getEmptyToothState(): Record<string, unknown> {
+  return {
+    toothSelection: "tooth-base",
+    toothSubstrate: "natural",
+    restorationType: "none",
+    restorationMaterial: "none",
+    prosthesis: "none",
+    endo: "none",
+    pulpDx: "normal",
+    pulpLatin: "none",
+    apicalDx: "normal",
+    periapicalType: "none",
+    resorptionType: "none",
+    periImplant: "none",
+    mobility: "none",
+    caries: [],
+    cariesSeverity: {},
+    cariesActiveDepth: 2,
+    rootCaries: "none",
+    radiographicDepth: {},
+    fillingMaterial: "none",
+    fillingSurfaces: [],
+    fillingSurfaceMaterials: {},
+    fillingDefect: {},
+    fissureSealing: false,
+    calculus: false,
+    contactMesial: false,
+    contactDistal: false,
+    wearEdge: "none",
+    wearCervical: "none",
+    discoloration: "none",
+    orthoAppliance: "none",
+    orthoDrift: "none",
+    orthoVertical: "none",
+    orthoRotation: false,
+    brokenMesial: false,
+    brokenIncisal: false,
+    brokenDistal: false,
+    crownLeakage: false,
+    crownReplace: false,
+    crownNeeded: false,
+    extractionPlan: false,
+    extractionWound: false,
+    missingClosed: false,
+    bridgePillar: false,
+    parapulpalPin: false,
+    endoResection: false,
+    mods: [],
+    customStates: {},
+    note: "",
+  };
+}
+
 
 watch([selected, surfaces, material], refreshPreview, { deep: true });
 watch(() => [...props.toothNos], () => refreshPreview(), { immediate: true });

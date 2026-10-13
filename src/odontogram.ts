@@ -3311,9 +3311,16 @@ export function getSelectedTeeth(): number[] {
  * ست کردن state یه دندون + رندر مجدد SVG.
  * برای preview و apply درمان از این استفاده کن.
  */
+/** 
+ * ست کردن state یه دندون + رندر مجدد SVG.
+ * برای preview و apply درمان از این استفاده کن.
+ * 
+ * @param options.replaceCustomStates اگر true، customStates کاملاً جایگزین می‌شود (نه merge)
+ */
 export function setToothStateAndRender(
   toothNo: number,
-  patch: Record<string, unknown>
+  patch: Record<string, unknown>,
+  options: { replaceCustomStates?: boolean } = {}
 ): void {
   const s = toothState.get(toothNo);
   if (!s) return;
@@ -3322,14 +3329,25 @@ export function setToothStateAndRender(
     if (Array.isArray(value) && s[key] instanceof Set) {
       s[key] = new Set(value);
     }
-    // ⭐ این را اضافه کنید:
+    // ⭐ customStates — با گزینه replace
     else if (key === "customStates" && typeof value === "object" && value !== null) {
-      s.customStates = {
-        ...(s.customStates || {}),
-        ...(value as Record<string, unknown>),
-      };
+      if (options.replaceCustomStates) {
+        // ⭐ REPLACE کامل (برای preview)
+        s.customStates = { ...(value as Record<string, unknown>) };
+      } else {
+        // merge (پیش‌فرض — برای derive)
+        s.customStates = {
+          ...(s.customStates || {}),
+          ...(value as Record<string, unknown>),
+        };
+      }
     }
-    else if (value && typeof value === 'object' && !Array.isArray(value) && s[key] instanceof Map) {
+    else if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      s[key] instanceof Map
+    ) {
       s[key] = new Map(Object.entries(value));
     }
     else {

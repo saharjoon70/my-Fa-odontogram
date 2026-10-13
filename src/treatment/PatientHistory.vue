@@ -158,73 +158,111 @@ const uniqueTeeth = computed(
 );
 
 // ═══ SVG Builder ═══
+
+// ═══ SVG Builder ═══
 const ALL_TEETH_NUMBERS = [
   18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
   48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
 ];
 
-function waitFrames(n = 3): Promise<void> {
-  return new Promise((resolve) => {
-    let count = 0;
-    function step() {
-      count++;
-      if (count >= n) resolve();
-      else requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  });
+type ToothStateSnapshot = Record<string, unknown>;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getEmptyToothState(): ToothStateSnapshot {
+  return {
+    toothSelection: "tooth-base",
+    toothSubstrate: "natural",
+    restorationType: "none",
+    restorationMaterial: "none",
+    prosthesis: "none",
+    endo: "none",
+    pulpDx: "normal",
+    pulpLatin: "none",
+    apicalDx: "normal",
+    periapicalType: "none",
+    resorptionType: "none",
+    periImplant: "none",
+    mobility: "none",
+    caries: [],
+    cariesSeverity: {},
+    cariesActiveDepth: 2,
+    rootCaries: "none",
+    radiographicDepth: {},
+    fillingMaterial: "none",
+    fillingSurfaces: [],
+    fillingSurfaceMaterials: {},
+    fillingDefect: {},
+    fissureSealing: false,
+    calculus: false,
+    contactMesial: false,
+    contactDistal: false,
+    wearEdge: "none",
+    wearCervical: "none",
+    discoloration: "none",
+    orthoAppliance: "none",
+    orthoDrift: "none",
+    orthoVertical: "none",
+    orthoRotation: false,
+    brokenMesial: false,
+    brokenIncisal: false,
+    brokenDistal: false,
+    crownLeakage: false,
+    crownReplace: false,
+    crownNeeded: false,
+    extractionPlan: false,
+    extractionWound: false,
+    missingClosed: false,
+    bridgePillar: false,
+    parapulpalPin: false,
+    endoResection: false,
+    mods: [],
+    customStates: {},
+    note: "",
+  };
 }
 
 async function buildPreview() {
   try {
-    // ─── حالت ۱: همه جلسات ───
-    if (filterSessionId.value === "all") {
-      await waitFrames(2);
-      const built = buildOdontogramSvgString();
-      if (!built) {
-        svgXml.value = "";
-        return;
-      }
-      svgXml.value = built.xml;
-      svgWidth.value = built.width;
-      svgHeight.value = built.height;
-      return;
-    }
-
-    // ─── حالت ۲: یک جلسه‌ی خاص ───
-    // 1. ذخیره‌ی state فعلی
+    // ⭐ همیشه از رکوردهای ذخیره‌شده می‌سازیم (نه از state فعلی)
+    // 1. ذخیره‌ی state فعلی همه‌ی دندان‌ها
     const savedSelectedTeeth = getSelectedTeeth();
-    const savedState = new Map<number, any>();
+    const savedState = new Map<number, ToothStateSnapshot>();
     for (const t of ALL_TEETH_NUMBERS) {
-      savedState.set(t, getToothState(t));
+      const s = getToothState(t);
+      if (s) savedState.set(t, s as ToothStateSnapshot);
     }
 
     try {
-      // 2. رکوردهای همان جلسه
-      const sessionRecords = getRecordsForPatient(props.patientId).filter(
-        (r) =>
-          (r.kind === "treatment" || r.kind === "diagnosis") &&
-          (r as TreatmentRecord).sessionId === filterSessionId.value,
-      );
+      // 2. رکوردهای مورد نظر
+      const allRecords = getRecordsForPatient(props.patientId).filter(
+        (r) => r.kind === "treatment" || r.kind === "diagnosis",
+      ) as (TreatmentRecord | DiagnosisRecord)[];
 
-      // 3. ریست همه‌ی دندان‌ها + اعمال فقط رکوردهای این جلسه
+      const targetRecords =
+        filterSessionId.value === "all"
+          ? allRecords
+          : allRecords.filter(
+              (r) => (r as TreatmentRecord).sessionId === filterSessionId.value,
+            );
+
+      // 3. ریست همه‌ی دندان‌ها + اعمال فقط رکوردهای ثبت‌شده
       for (const t of ALL_TEETH_NUMBERS) {
-        const toothRecords = sessionRecords.filter((r) => r.toothNo === t);
+        const toothRecords = targetRecords.filter((r) => r.toothNo === t);
         if (toothRecords.length > 0) {
           const patch = derivePatchFromRecords(toothRecords);
           setToothStateAndRender(t, patch);
         } else {
-          setToothStateAndRender(t, {
-            toothSelection: "tooth-base",
-            toothSubstrate: "natural",
-            restorationType: "none",
-            restorationMaterial: "none",
-          });
+          setToothStateAndRender(t, getEmptyToothState());
         }
       }
 
-      // 4. صبر برای re-render کامل
-      await waitFrames(4);
+      // 4. صبر برای DOM واقعاً آپدیت شود
+      await wait(80);
+      await wait(80);
+      await wait(80);
 
       // 5. SVG بساز
       const built = buildOdontogramSvgString();
@@ -236,7 +274,7 @@ async function buildPreview() {
         svgXml.value = "";
       }
     } finally {
-      // 6. برگرداندن state قبلی (حتماً اجرا شود)
+      // 6. برگرداندن state قبلی
       for (const t of ALL_TEETH_NUMBERS) {
         const s = savedState.get(t);
         if (s) {
@@ -246,7 +284,7 @@ async function buildPreview() {
       setSelectedTeeth(savedSelectedTeeth);
 
       // 7. صبر برای re-render برگشت
-      await waitFrames(2);
+      await wait(50);
     }
   } catch (e) {
     console.error("Failed to build SVG preview", e);
