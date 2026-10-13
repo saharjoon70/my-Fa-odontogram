@@ -4,13 +4,15 @@ import {
   getSelectedTeeth,
   onSelectionChange,
   onStateChange,
+  setSelectedTeeth,              // ⭐ جدید
+  setToothStateAndRender, 
 } from "../odontogram";
 import { submitTreatment } from "./applyTreatment";
 import {
   addSession,
-  updateSession,
+ updateSession,                  // ⭐ قبلاً بود
   getNextSessionNumber,
-  getNextSessionNumberForPatient,
+  getNextSessionNumberForPatient, // ⭐ قبلاً بود
 } from "./treatmentPlanStore";
 import TreatmentForm from "./TreatmentForm.vue";
 
@@ -84,6 +86,16 @@ function onSubmit(payload: {
         doctorId: payload.doctorId,
       });
     }
+
+    // ⭐ بعد از ثبت طرح، state دندان‌ها را کامل ریست کن
+    for (const toothNo of selectedTeeth.value) {
+      setToothStateAndRender(
+        toothNo,
+        getEmptyToothState(),
+        { replaceCustomStates: true },
+      );
+    }
+
     refresh();
     return;
   }
@@ -92,7 +104,7 @@ function onSubmit(payload: {
   // mode = done → جلسه + درمان
   // ═══════════════════════════════════════════════════════════════
 
-  // ─── مالی جلسه (فقط این بخش روی session ذخیره می‌شود) ───
+  // ─── مالی جلسه ───
   const sessionFinancial = {
     discountType: payload.discountType,
     discountValue: payload.discountValue,
@@ -111,7 +123,7 @@ function onSubmit(payload: {
     payload.sessionMode === "existing" && !!finalSessionId;
 
   if (isExistingSession && finalSessionId) {
-    // ⭐ جلسه‌ی موجود → فقط تخفیف/بیمه را روی آن آپدیت کن
+    // ⭐ جلسه‌ی موجود → فقط تخفیف/بیمه را آپدیت کن
     updateSession(finalSessionId, sessionFinancial);
   } else {
     // ⭐ جلسه‌ی جدید بساز
@@ -131,7 +143,6 @@ function onSubmit(payload: {
       status: "done",
       doctorId: payload.doctorId,
       assistantId: payload.assistantId,
-      // ⭐ مالی جلسه
       ...sessionFinancial,
     });
 
@@ -140,7 +151,7 @@ function onSubmit(payload: {
     finalSessionTitle = newSess.title;
   }
 
-  // ─── مرحله ۲: ثبت درمان برای هر دندان (بدون تخفیف/بیمه) ───
+  // ─── مرحله ۲: ثبت درمان برای هر دندان ───
   for (const toothNo of selectedTeeth.value) {
     submitTreatment(props.patientId, toothNo, {
       treatmentId: payload.treatmentId,
@@ -161,11 +172,77 @@ function onSubmit(payload: {
       sessionDate: payload.date,
       sessionTime: payload.time,
       time: payload.time,
-      // ❌ تخفیف/بیمه اینجا نمی‌رود (روی session است)
     });
   }
 
+  // ⭐ مرحله ۳: بعد از ثبت، state دندان‌ها را کامل ریست کن
+  //    (تا odontogram صفحه اصلی پاک شود و برای درمان بعدی آماده باشد)
+  for (const toothNo of selectedTeeth.value) {
+    setToothStateAndRender(
+      toothNo,
+      getEmptyToothState(),
+      { replaceCustomStates: true },
+    );
+  }
+
+  // ⭐ پاک کردن انتخاب دندان‌ها
+  setSelectedTeeth([]);
+
   refresh();
+}
+
+// ⭐ تابع کمکی برای state خالی
+function getEmptyToothState(): Record<string, unknown> {
+  return {
+    toothSelection: "tooth-base",
+    toothSubstrate: "natural",
+    restorationType: "none",
+    restorationMaterial: "none",
+    prosthesis: "none",
+    endo: "none",
+    pulpDx: "normal",
+    pulpLatin: "none",
+    apicalDx: "normal",
+    periapicalType: "none",
+    resorptionType: "none",
+    periImplant: "none",
+    mobility: "none",
+    caries: [],
+    cariesSeverity: {},
+    cariesActiveDepth: 2,
+    rootCaries: "none",
+    radiographicDepth: {},
+    fillingMaterial: "none",
+    fillingSurfaces: [],
+    fillingSurfaceMaterials: {},
+    fillingDefect: {},
+    fissureSealing: false,
+    calculus: false,
+    contactMesial: false,
+    contactDistal: false,
+    wearEdge: "none",
+    wearCervical: "none",
+    discoloration: "none",
+    orthoAppliance: "none",
+    orthoDrift: "none",
+    orthoVertical: "none",
+    orthoRotation: false,
+    brokenMesial: false,
+    brokenIncisal: false,
+    brokenDistal: false,
+    crownLeakage: false,
+    crownReplace: false,
+    crownNeeded: false,
+    extractionPlan: false,
+    extractionWound: false,
+    missingClosed: false,
+    bridgePillar: false,
+    parapulpalPin: false,
+    endoResection: false,
+    mods: [],
+    customStates: {},
+    note: "",
+  };
 }
 </script>
 

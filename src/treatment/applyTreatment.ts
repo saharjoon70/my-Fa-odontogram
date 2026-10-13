@@ -32,6 +32,64 @@ export function recomputeToothState(
   toothNo: number,
 ): void {
   const records = getRecordsForTooth(patientId, toothNo);
+
+  // ⭐ 1. ریست کامل state دندان (حذف preview قبلی)
+  setToothStateAndRender(
+    toothNo,
+    {
+      toothSelection: "tooth-base",
+      toothSubstrate: "natural",
+      restorationType: "none",
+      restorationMaterial: "none",
+      prosthesis: "none",
+      endo: "none",
+      pulpDx: "normal",
+      pulpLatin: "none",
+      apicalDx: "normal",
+      periapicalType: "none",
+      resorptionType: "none",
+      periImplant: "none",
+      mobility: "none",
+      caries: [],
+      cariesSeverity: {},
+      cariesActiveDepth: 2,
+      rootCaries: "none",
+      radiographicDepth: {},
+      fillingMaterial: "none",
+      fillingSurfaces: [],
+      fillingSurfaceMaterials: {},
+      fillingDefect: {},
+      fissureSealing: false,
+      calculus: false,
+      contactMesial: false,
+      contactDistal: false,
+      wearEdge: "none",
+      wearCervical: "none",
+      discoloration: "none",
+      orthoAppliance: "none",
+      orthoDrift: "none",
+      orthoVertical: "none",
+      orthoRotation: false,
+      brokenMesial: false,
+      brokenIncisal: false,
+      brokenDistal: false,
+      crownLeakage: false,
+      crownReplace: false,
+      crownNeeded: false,
+      extractionPlan: false,
+      extractionWound: false,
+      missingClosed: false,
+      bridgePillar: false,
+      parapulpalPin: false,
+      endoResection: false,
+      mods: [],
+      customStates: {},
+      note: "",
+    },
+    { replaceCustomStates: true },
+  );
+
+  // ⭐ 2. اگر رکورد هست، اعمال کن
   if (records.length > 0) {
     const patch = derivePatchFromRecords(records);
     setToothStateAndRender(toothNo, patch);
