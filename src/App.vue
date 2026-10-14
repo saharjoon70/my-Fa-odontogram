@@ -39,7 +39,7 @@ import { applyThemeConfig, type OdontogramThemeConfig } from "./theme";
 import type { OdontogramPlugin } from "./plugin";
 import TreatmentTabs from "./treatment/TreatmentTabs.vue";
 import PatientHistory from "./treatment/PatientHistory.vue";
-import { recomputeToothState } from "./treatment/applyTreatment";
+
 import { getRecordsForPatient } from "./treatment/treatmentStore";
 import type { TreatmentRecord } from "./treatment/treatmentStore";
 
@@ -212,9 +212,9 @@ onMounted(async () => {
 
   selectionUnsubscribe = onSelectionChange((teeth) => {
     selectedTeeth.value = teeth;
-    for (const toothNo of teeth) {
-      recomputeToothState(patientId.value, toothNo);
-    }
+    // ⭐ حذف شد: recomputeToothState برای هر دندان
+    // (چون odontogram بعد از ثبت پاک می‌شود و کاربر می‌خواهد
+    //  برای درمان جدید dental را خالی ببیند، نه با رکوردهای قبلی)
   });
 });
 

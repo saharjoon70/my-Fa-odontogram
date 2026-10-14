@@ -97,7 +97,9 @@ function onSubmit(payload: {
     }
 
     refresh();
+    console.log("=== onSubmit END ===");
     return;
+    
   }
 
   // ═══════════════════════════════════════════════════════════════

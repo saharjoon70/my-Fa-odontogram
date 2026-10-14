@@ -14,8 +14,8 @@ import {
   previewTreatmentItem,
   resetToothToStoredState,
 } from "./applyTreatment";
+import { getToothState } from "../odontogram";
 import { setToothStateAndRender } from "../odontogram";
-import { getRecordsForTooth } from "./treatmentStore";
 import {
   getPlansForPatient,
   getSessionsForPatient,
@@ -26,6 +26,8 @@ import {
   getNextSessionNumber,
   getNextSessionNumberForPatient,
   getPlanById,
+  getLastSelection,      // ⭐ اضافه شد
+  saveLastSelection,     // ⭐ اضافه شد
   type TreatmentSession,
 } from "./treatmentPlanStore";
 import {
@@ -173,10 +175,13 @@ const insuranceProviders = computed(() => getInsuranceProviders());
 const doctors = computed(() => getDoctors());
 const assistants = computed(() => getAssistants());
 
-// ⭐ پیش‌فرض: جلسه‌ی جدید خودکار
-// (اگر جلسه‌ای ثبت شد، watch زیر خودکار به آن سوئیچ می‌کند)
-sessionMode.value = "auto" as "auto" | "existing" | "new";
-selectedSessionId.value = "";
+// ⭐ بازیابی آخرین انتخاب از حافظه (per patient)
+//    این باعث می‌شه وقتی تب عوض می‌شه و TreatmentForm دوباره mount می‌شه،
+//    انتخاب قبلی (sessionMode + selectedSessionId + selectedPlanId) بازیابی بشه.
+const lastSelection = getLastSelection(props.patientId);
+sessionMode.value = lastSelection.sessionMode;
+selectedSessionId.value = lastSelection.selectedSessionId;
+selectedPlanId.value = lastSelection.selectedPlanId;
 
 // ⭐ وقتی جلسه‌ی جدیدی برای این بیمار اضافه شد (در همین نشست)،
 //    به‌طور خودکار به آن سوئیچ کن
@@ -243,31 +248,6 @@ const canSubmit = computed(() => {
   return true;
 });
 
-// ═══ Preview ═══
-function refreshPreview() {
-  if (props.toothNos.length === 0) return;
-
-  // ⭐ 1. ریست کامل state دندان‌ها
-  for (const toothNo of props.toothNos) {
-    setToothStateAndRender(toothNo, getEmptyToothState(), {
-      replaceCustomStates: true,   // ⭐ مهم
-    });
-  }
-
-  // ⭐ 2. برگرداندن رکوردهای ذخیره‌شده
-  for (const toothNo of props.toothNos) {
-    resetToothToStoredState(props.patientId, toothNo);
-  }
-
-  // ⭐ 3. اعمال preview درمان انتخاب‌شده
-  if (!selected.value) return;
-  for (const toothNo of props.toothNos) {
-    previewTreatmentItem(toothNo, selected.value, {
-      surfaces: surfaces.value,
-      material: material.value || undefined,
-    });
-  }
-}
 
 // ⭐ state خالی برای ریست
 function getEmptyToothState(): Record<string, unknown> {
@@ -322,10 +302,39 @@ function getEmptyToothState(): Record<string, unknown> {
     note: "",
   };
 }
+// ═══ Preview ═══
+function refreshPreview() {
+  if (props.toothNos.length === 0) return;
+
+  // ⭐ 1. state خالی — بدون رکوردهای قبلی
+  for (const toothNo of props.toothNos) {
+    setToothStateAndRender(toothNo, getEmptyToothState(), {
+      replaceCustomStates: true,
+    });
+  }
+
+  // ⭐ 2. preview درمان جدید (اگه انتخاب شده)
+  if (!selected.value) return;
+  
+  for (const toothNo of props.toothNos) {
+    previewTreatmentItem(toothNo, selected.value, {
+      surfaces: surfaces.value,
+      material: material.value || undefined,
+    });
+  }
+}
 
 
 watch([selected, surfaces, material], refreshPreview, { deep: true });
-watch(() => [...props.toothNos], () => refreshPreview(), { immediate: true });
+watch(
+  () => [...props.toothNos],
+  (newVal, oldVal) => {
+    if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+      refreshPreview();
+    }
+  },
+  { immediate: true },  // ⭐ اضافه شد
+);
 
 // ⭐ وقتی جلسه انتخاب شد، طرحش و تخفیف/بیمه‌اش را load کن
 watch(selectedSession, (sess) => {
@@ -402,6 +411,17 @@ watch(selectedSessionId, (newId) => {
     date.value = session.sessionDate;
     time.value = session.sessionTime || "10:00";
   }
+});
+
+// ⭐ ذخیره‌ی آخرین انتخاب‌ها هر وقت عوض شدن
+//    این باعث می‌شه وقتی تب عوض می‌شه و TreatmentForm دوباره mount می‌شه،
+//    انتخاب قبلی (sessionMode + selectedSessionId + selectedPlanId) بازیابی بشه.
+watch([sessionMode, selectedSessionId, selectedPlanId], () => {
+  saveLastSelection(props.patientId, {
+    sessionMode: sessionMode.value,
+    selectedSessionId: selectedSessionId.value,
+    selectedPlanId: selectedPlanId.value,
+  });
 });
 
 function initTeamDefaults() {
@@ -587,9 +607,7 @@ function onCancel() {
   hasInsurance.value = false;
   insuranceValue.value = 0;
   insuranceName.value = "";
-  for (const toothNo of props.toothNos) {
-    resetToothToStoredState(props.patientId, toothNo);
-  }
+
 }
 </script>
 

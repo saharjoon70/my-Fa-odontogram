@@ -2,8 +2,7 @@
 // لایه مپینگ: از وضعیت‌های UI به state engine
 // این فایل قلب کار است — هر فیلد UI را به فیلد engine ترجمه می‌کند
 
-import type { StatusItem, StatusRadio, StatusGroup } from "./statusGroups";
-import { STATUS_GROUPS } from "./statusGroups";
+import type { StatusItem, StatusRadio } from "./statusGroups";
 
 /** فیلدهای state در odontogram.ts که UI به آن‌ها دسترسی دارد */
 // src/treatment/statusToState.ts
