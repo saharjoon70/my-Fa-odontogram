@@ -23,6 +23,8 @@ export interface StatusRecord extends BaseRecord {
   value: unknown;
 }
 
+// src/treatment/treatmentStore.ts
+
 export interface TreatmentRecord extends BaseRecord {
   kind: "treatment";
   treatmentId: string;
@@ -31,18 +33,63 @@ export interface TreatmentRecord extends BaseRecord {
   surface?: string;
   material?: string;
   price: number;
-  status: "done" | "planned";
+  status: "done" | "planned" | "cancelled";
+
+  // ⭐ طرح و جلسه
+  planId?: string;          // به کدوم طرح مربوطه
+  planTitle?: string;       // عنوان طرح (کش می‌شه)
+  sessionId?: string;       // به کدوم جلسه مربوطه
+  sessionDate?: string;     // تاریخ جلسه
+  sessionTime?: string;     // ساعت جلسه
+
+  // ⭐ تیم
+  doctorId?: string;
+  assistantId?: string;
+  time?: string;
+
+  // ⭐ مالی
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  discountAmount?: number;
+
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
+  insuranceAmount?: number;
+  patientAmount?: number;
+
+  // ⭐ رادیوگرافی
+  radiographId?: string;    // ⭐ مفرد (نه جمع)
 }
 
 export interface DiagnosisRecord extends BaseRecord {
   kind: "diagnosis";
   planId?: string;
+  sessionId?: string;       // ⭐ جدید
   planLabel?: string;
   clinicalDx?: string;
   dxValue?: string;
   price: number;
-  status: "done" | "planned";
+  status: "done" | "planned" | "cancelled";
+
+  doctorId?: string;
+  assistantId?: string;
+  time?: string;
+
+  // مالی
+  discountType?: "percent" | "amount";
+  discountValue?: number;
+  discountReason?: string;
+  discountAmount?: number;
+
+  insuranceType?: "percent" | "amount" | "none";
+  insuranceValue?: number;
+  insuranceName?: string;
+  insuranceAmount?: number;
+  patientAmount?: number;
 }
+
 
 export type OdontogramRecord = StatusRecord | TreatmentRecord | DiagnosisRecord;
 

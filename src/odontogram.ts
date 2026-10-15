@@ -1495,12 +1495,13 @@ function setPulpInflamPaths(svg: Any, active: boolean){
 // ---- SVG apply logic ----
 function applyStateToSvgSingle(toothNo: Any, svg: Any, state: Any = toothState.get(toothNo)){
   if(!state || !svg) return;
-console.log("[applyStateToSvgSingle]", toothNo,
-  "customStates:", JSON.stringify(state.customStates),
-  "isMap:", state.customStates instanceof Map,
-  "keys:", Object.keys(state.customStates || {}));
-  // 0) Start from a clean baseline: turn OFF all switchables, then apply ON flags.
-  // (Base stays as in SVG; we don't toggle #base)
+
+    if (toothNo === 11) {
+    console.log(`[APPLY 11] toothSelection:`, state.toothSelection, 
+      "extractionWound:", state.extractionWound,
+      "customStates:", JSON.stringify(state.customStates));
+  }
+  
   const switchable = ["mods","tooth-variants","endos","surfaces","restorations","tooth"];
   for(const gId of switchable){
     const g = svgGetById(svg, gId);
@@ -1512,6 +1513,44 @@ console.log("[applyStateToSvgSingle]", toothNo,
 
   // Turn OFF all known switchable layers (derived from the registry + fixed non-axis set).
   for (const id of allClearLayers()) setActive(svgGetById(svg, id), false);
+  // ⭐ خاموش کردن عناصر تشخیصی که در allClearLayers نیستند
+  // ⭐ خاموش کردن عناصر variant که در allClearLayers نیستند
+//    این‌ها در SVG اصلی data-active="1" دارند (بدون display:none)
+//    پس stripDisplayNoneToDataActive آن‌ها را پاک نمی‌کند
+const VARIANT_IDS = [
+  "no-tooth-after-extraction",
+  "tooth-broken-incisal",
+  "tooth-broken-distal-incisal",
+  "tooth-broken-distal",
+  "tooth-broken-mesial-distal-incisal",
+  "tooth-broken-mesial-distal",
+  "tooth-broken-mesial-incisal",
+  "tooth-broken-mesial",
+  "tooth-radix",
+  "tooth-crownprep",
+  "tooth-mobility-1",
+  "tooth-mobility-2",
+  "tooth-mobility-3",
+  "extraction-wound",
+  "missing-closed",
+];
+for (const id of VARIANT_IDS) {
+  setActive(svgGetById(svg, id), false);
+}
+const EXTRA_CLEAR_IDS = [
+  "cysta-outside", "cysta-inside",
+  "granuloma-outside", "granuloma-inside",
+  "abscess-inside",
+  "tooth-mobility-1", "tooth-mobility-2", "tooth-mobility-3",
+  // ⭐ اضافه کنید
+  "no-tooth-after-extraction",
+  "extraction-wound",
+  "missing-closed",
+  "prosthesis",
+  "prosthesis-crown",
+  "prosthesis-connector",
+];
+for (const id of EXTRA_CLEAR_IDS) setActive(svgGetById(svg, id), false);
 
   const hasCrown = state.restorationType !== "none";
   const brokenVariant = state.toothSubstrate === "broken" ? getBrokenCrownVariant(state) : null;
@@ -2026,6 +2065,46 @@ for (let i = 0; i < allSvgElements.length; i++) {
     setActive(layer, activeTreatments.includes(tid));
   }
 }
+  // ⭐ پاک‌سازی نهایی — variantها را بر اساس state نهایی تنظیم کن
+  const finalSel = state.toothSelection;
+  const finalIsNone = finalSel === "none";
+  const finalIsExtraction = finalSel === "no-tooth-after-extraction";
+  const finalIsImplant = finalSel === "implant";
+
+  const shouldShowExtraction = (finalIsNone && state.extractionWound) || finalIsExtraction;
+  setActive(svgGetById(svg, "no-tooth-after-extraction"), shouldShowExtraction);
+
+  const shouldShowBroken = finalSel === "tooth-base" && state.toothSubstrate === "broken";
+  if (!shouldShowBroken) {
+    const BROKEN_IDS = [
+      "tooth-broken-incisal", "tooth-broken-distal-incisal", "tooth-broken-distal",
+      "tooth-broken-mesial-distal-incisal", "tooth-broken-mesial-distal",
+      "tooth-broken-mesial-incisal", "tooth-broken-mesial",
+    ];
+    for (const id of BROKEN_IDS) setActive(svgGetById(svg, id), false);
+  }
+
+  setActive(svgGetById(svg, "tooth-radix"), finalSel === "tooth-base" && state.toothSubstrate === "radix");
+  setActive(svgGetById(svg, "tooth-crownprep"), finalSel === "tooth-base" && state.toothSubstrate === "crownprep");
+
+  const shouldShowMobility = state.mobility !== "none" && finalSel !== "none" && !finalIsImplant && !finalIsExtraction;
+  setActive(svgGetById(svg, "tooth-mobility-1"), shouldShowMobility && state.mobility === "m1");
+  setActive(svgGetById(svg, "tooth-mobility-2"), shouldShowMobility && state.mobility === "m2");
+  setActive(svgGetById(svg, "tooth-mobility-3"), shouldShowMobility && state.mobility === "m3");
+
+  const finalPeriapicalActive = isToothPresent(finalSel)
+    ? state.apicalDx !== "normal"
+    : (finalIsImplant ? false : state.mods.has("inflammation"));
+  if (!finalPeriapicalActive) {
+    setActive(svgGetById(svg, "cysta"), false);
+    setActive(svgGetById(svg, "cysta-outside"), false);
+    setActive(svgGetById(svg, "cysta-inside"), false);
+    setActive(svgGetById(svg, "granuloma"), false);
+    setActive(svgGetById(svg, "granuloma-outside"), false);
+    setActive(svgGetById(svg, "granuloma-inside"), false);
+    setActive(svgGetById(svg, "abscess"), false);
+    setActive(svgGetById(svg, "abscess-inside"), false);
+  }
 
 updateWarnings(state);
 }
@@ -2723,7 +2802,7 @@ export function __syncToothDetailControlsForTest(state: Record<string, unknown>)
 }
 
 function syncControlsFromState(state: Any){
-  // SP4 Task 5: apical (AAE) diagnosis picker.
+    if (!state) state = defaultState();
   setSelectOptions($("#apicalDxSelect"), getApicalDxOptions(), state.apicalDx);
   if($("#apicalDxSelect").value !== state.apicalDx){
     state.apicalDx = $("#apicalDxSelect").value;
@@ -3311,9 +3390,16 @@ export function getSelectedTeeth(): number[] {
  * ست کردن state یه دندون + رندر مجدد SVG.
  * برای preview و apply درمان از این استفاده کن.
  */
+/** 
+ * ست کردن state یه دندون + رندر مجدد SVG.
+ * برای preview و apply درمان از این استفاده کن.
+ * 
+ * @param options.replaceCustomStates اگر true، customStates کاملاً جایگزین می‌شود (نه merge)
+ */
 export function setToothStateAndRender(
   toothNo: number,
-  patch: Record<string, unknown>
+  patch: Record<string, unknown>,
+  options: { replaceCustomStates?: boolean } = {}
 ): void {
   const s = toothState.get(toothNo);
   if (!s) return;
@@ -3322,14 +3408,25 @@ export function setToothStateAndRender(
     if (Array.isArray(value) && s[key] instanceof Set) {
       s[key] = new Set(value);
     }
-    // ⭐ این را اضافه کنید:
+    // ⭐ customStates — با گزینه replace
     else if (key === "customStates" && typeof value === "object" && value !== null) {
-      s.customStates = {
-        ...(s.customStates || {}),
-        ...(value as Record<string, unknown>),
-      };
+      if (options.replaceCustomStates) {
+        // ⭐ REPLACE کامل (برای preview)
+        s.customStates = { ...(value as Record<string, unknown>) };
+      } else {
+        // merge (پیش‌فرض — برای derive)
+        s.customStates = {
+          ...(s.customStates || {}),
+          ...(value as Record<string, unknown>),
+        };
+      }
     }
-    else if (value && typeof value === 'object' && !Array.isArray(value) && s[key] instanceof Map) {
+    else if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      s[key] instanceof Map
+    ) {
       s[key] = new Map(Object.entries(value));
     }
     else {
@@ -3465,6 +3562,9 @@ export function clearSelection(): void {
 
 
 function updateSelectionUI(){
+    console.log("=== updateSelectionUI ===");
+  console.log("selectedTeeth:", Array.from(selectedTeeth));
+  console.log("activeTooth:", activeTooth);
   $$(".tooth-tile").forEach(tile => {
     const toothNo = Number(tile.dataset.tooth);
     const isSelected = selectedTeeth.has(toothNo);
@@ -5040,6 +5140,18 @@ export function buildOdontogramSvg(): { xml: string; width: number; height: numb
   const xml = new XMLSerializer().serializeToString(out);
   return { xml: `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`, width: W, height: H };
 }
+
+// ⭐ NEW: return the odontogram SVG as a string (no download).
+// Used by PatientHistory.vue to embed the chart inline in a modal.
+export function buildOdontogramSvgString(): {
+  xml: string;
+  width: number;
+  height: number;
+} | null {
+  return buildOdontogramSvg();
+}
+
+
 
 /** Export the odontogram as a downloadable, scalable SVG file. */
 export async function exportSvg(){

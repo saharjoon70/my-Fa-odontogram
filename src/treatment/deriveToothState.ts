@@ -140,20 +140,21 @@ function applyPatch(
     }
 
     // customStates: { key: value } — activeTreatments را merge کن
-    if (key === "customStates" && typeof value === "object" && value !== null) {
-      const cs = { ...(next.customStates as Record<string, unknown> ?? {}) };
-      const incoming = value as Record<string, unknown>;
-      if (Array.isArray(incoming.activeTreatments)) {
-        const existing = Array.isArray(cs.activeTreatments) ? cs.activeTreatments as string[] : [];
-        cs.activeTreatments = Array.from(new Set([...existing, ...(incoming.activeTreatments as string[])]));
-      }
-      for (const [k, v] of Object.entries(incoming)) {
-        if (k === "activeTreatments") continue;
-        cs[k] = v;
-      }
-      next.customStates = cs;
-      continue;
-    }
+// customStates: { key: value }
+if (key === "customStates" && typeof value === "object" && value !== null) {
+  const cs = { ...(next.customStates as Record<string, unknown> ?? {}) };
+  const incoming = value as Record<string, unknown>;
+  if (Array.isArray(incoming.activeTreatments)) {
+    // ⭐ REPLACE (نه merge) — preview باید فقط درمان فعلی را نشان دهد
+    cs.activeTreatments = [...(incoming.activeTreatments as string[])];
+  }
+  for (const [k, v] of Object.entries(incoming)) {
+    if (k === "activeTreatments") continue;
+    cs[k] = v;
+  }
+  next.customStates = cs;
+  continue;
+}
 
     // بقیه
     next[key] = value;
@@ -401,10 +402,15 @@ export function treatmentToPatchPreview(
   }
 
   // ═══ جراحی ═══
-  else if (id.startsWith("extraction-")) {
-    patch.toothSelection = "none";
-    patch.extractionWound = true;
-  } else if (id === "implant") {
+else if (id.startsWith("extraction-")) {
+  patch.toothSelection = "none";
+  patch.extractionWound = true;
+  // ⭐ customStates برای نمایش بصری
+  patch.customStates = {
+    ...(patch.customStates as Record<string, unknown> ?? {}),
+    activeTreatments: [id],
+  };
+} else if (id === "implant") {
     patch.toothSelection = "implant";
   }
 
@@ -412,14 +418,19 @@ export function treatmentToPatchPreview(
   else if (id === "bridge") {
     patch.restorationType = "bridge";
     patch.restorationMaterial = material || "zircon";
-  } else if (id === "denture-full" || id === "denture-upper" ||
-             id === "denture-lower" || id === "denture-immediate") {
+  } else if (id === "denture-full" || id === "denture-upper" || id === "denture-lower" || id === "denture-immediate") {
     patch.prosthesis = "removable-full";
     patch.toothSelection = "none";
+    patch.customStates = { ...(patch.customStates as Record<string, unknown> ?? {}), activeTreatments: [id] };
   } else if (id === "denture-partial") {
-    patch.prosthesis = "removable-partial";
-    patch.toothSelection = "none";
-  } else if (id === "overdenture") {
+  patch.prosthesis = "removable-partial";
+  patch.toothSelection = "none";
+  // ⭐ customStates برای نمایش بصری
+  patch.customStates = {
+    ...(patch.customStates as Record<string, unknown> ?? {}),
+    activeTreatments: [id],
+  };
+} else if (id === "overdenture") {
     patch.prosthesis = "bar-denture";
     patch.toothSelection = "implant";
   }

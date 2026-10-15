@@ -57,26 +57,38 @@ export {
 // Store
 // ═══════════════════════════════════════════════
 export {
-  store,
-  addRecord,
-  removeRecord,
-  removeRecordsForTooth,
-  removeRecordsForPatient,
-  clearAll,
-  getRecordsForTooth,
-  getRecordsByKind,
-  getRecordsForPatient,
-  getToothTotal,
-  getPatientTotal,
-  allRecords,
-  recordCount,
-  type OdontogramRecord,
-  type StatusRecord,
-  type TreatmentRecord,
-  type DiagnosisRecord,
-  type RecordKind,
-  type BaseRecord,
-} from "./treatmentStore";
+  planStore,
+  addPlan,
+  updatePlan,
+  removePlan,
+  getPlanById,
+  getPlansForPatient,
+  addSession,
+  updateSession,
+  removeSession,
+  getSessionById,
+  getSessionsForPatient,
+  getSessionsForPlan,
+  getUpcomingSessions,
+  getTodaySessions,
+  getPastSessions,
+  getNextSessionNumber,
+  addStaff,
+  updateStaff,
+  removeStaff,
+  getDoctors,
+  getAssistants,
+  getStaffById,
+  allPlans,
+  allSessions,
+  allStaff,
+  type PlanStatus,
+  type SessionStatus,
+  type StaffRole,
+  type StaffMember,
+  type TreatmentPlan,
+  type TreatmentSession,
+} from "./treatmentPlanStore";
 
 // ═══════════════════════════════════════════════
 // Derive
@@ -92,15 +104,11 @@ export {
 // Apply (public API)
 // ═══════════════════════════════════════════════
 export {
-  recomputeToothState,
-  applyPatchToTooth,
-  resetToothToDefault,
-  submitStatus,
-  unsubmitStatus,
-  submitTreatment,
-  submitDiagnosis,
-  deleteRecord,
-
+  getPlannedRecordsForPatient,
+  getRecordsForSession,
+  getRecordsForPlan,
+  markAsDone,
+  markAsPlanned,
 } from "./applyTreatment";
 
 // ═══════════════════════════════════════════════
@@ -114,3 +122,9 @@ export { default as TreatmentForm } from "./TreatmentForm.vue";
 export { default as DiagnosisPanel } from "./DiagnosisPanel.vue";
 export { default as DiagnosisForm } from "./DiagnosisForm.vue";
 export { default as TreatmentHistory } from "./TreatmentHistory.vue";
+// Components
+export { default as TreatmentPlanPanel } from "./TreatmentPlanPanel.vue";
+export { default as SessionsPanel } from "./SessionsPanel.vue";
+export { default as TreatmentPlanModal } from "./TreatmentPlanModal.vue";
+export { default as SessionModal } from "./SessionModal.vue";
+export { default as TreatmentRecordForm } from "./TreatmentRecordForm.vue";

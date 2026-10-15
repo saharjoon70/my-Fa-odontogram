@@ -347,8 +347,8 @@ select:focus{
 .btn-icon .icon,
 .btn-icon .icon-img,
 .btn-icon svg{
-  width:32px;
-  height:32px;
+  width:25px;
+  height:25px;
   display:block;
 }
 .fade-toggle{
