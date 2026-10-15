@@ -143,12 +143,18 @@ const PATIENTS = [
 ];
 
 const selectedTeeth = ref<number[]>([]);
+const lastSelectedTeeth = ref<number[]>([]);   // ⭐ جدید
 const historyOpen = ref(false);
 
 // ⭐ لیست درمان‌های دندان‌های انتخاب‌شده
 const selectedTreatments = computed(() => {
   const all: TreatmentRecord[] = [];
-  for (const toothNo of selectedTeeth.value) {
+  // ⭐ از lastSelectedTeeth استفاده کن (نه selectedTeeth)
+  const teethToUse = selectedTeeth.value.length > 0 
+    ? selectedTeeth.value 
+    : lastSelectedTeeth.value;
+  
+  for (const toothNo of teethToUse) {
     const records = getRecordsForPatient(patientId.value).filter(
       (r): r is TreatmentRecord =>
         r.kind === "treatment" && r.toothNo === toothNo,
@@ -212,6 +218,9 @@ onMounted(async () => {
 
   selectionUnsubscribe = onSelectionChange((teeth) => {
     selectedTeeth.value = teeth;
+    if (teeth.length > 0) {
+    lastSelectedTeeth.value = teeth;
+  }
     // ⭐ حذف شد: recomputeToothState برای هر دندان
     // (چون odontogram بعد از ثبت پاک می‌شود و کاربر می‌خواهد
     //  برای درمان جدید dental را خالی ببیند، نه با رکوردهای قبلی)
@@ -405,8 +414,8 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
         <div id="toothGrid" class="tooth-grid"></div>
 
         <!-- ⭐ توضیحات و جزئیات درمان‌های دندان‌های انتخاب‌شده -->
-        <div v-if="selectedTeeth.length > 0" class="tooth-treatments-info">
-          <div class="summary-header">
+           <div v-if="selectedTreatments.length > 0" class="tooth-treatments-info">     
+                 <div class="summary-header">
             <span>📋 درمان‌های دندان انتخاب‌شده:</span>
             <span class="count">{{ selectedTreatments.length }} مورد</span>
           </div>
@@ -796,10 +805,10 @@ watch(() => props.readOnly, (v) => setReadOnly(v ?? false), { immediate: true })
 }
 
 #toothGrid {
-  flex: 1;
-  min-height: 0;
+  /* flex: 1;
+  min-height: 0; */
   overflow: auto;
-  margin-top: 8px;
+  margin-top: 5px;
 }
 
 /* ⭐ توضیحات و جزئیات درمان‌ها */
